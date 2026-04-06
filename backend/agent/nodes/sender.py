@@ -1,4 +1,4 @@
-"""Phase 4: Gmail API sending."""
+"""Phase 4: Gmail API sending — supports both local file and env-based tokens."""
 
 import base64
 import json
@@ -20,7 +20,13 @@ COUNTRY_NAMES = {
 
 
 def get_gmail_service():
-    """Build Gmail API service using OAuth2 credentials."""
+    """Build Gmail API service.
+
+    Token resolution order:
+    1. GMAIL_TOKEN_JSON env var (for GitHub Actions — token content as string)
+    2. GMAIL_CREDENTIALS_JSON env var (for GitHub Actions — credentials content)
+    3. Local file: .gmail_token.json / .gmail_credentials.json
+    """
     from google.auth.transport.requests import Request
     from google.oauth2.credentials import Credentials
     from google_auth_oauthlib.flow import InstalledAppFlow
@@ -28,6 +34,22 @@ def get_gmail_service():
 
     SCOPES = ["https://www.googleapis.com/auth/gmail.send"]
     creds = None
+
+    # --- Option 1: Token from environment variable (GitHub Actions) ---
+    token_json_env = os.environ.get("GMAIL_TOKEN_JSON", "")
+    if token_json_env:
+        logger.info("Using Gmail token from GMAIL_TOKEN_JSON env var")
+        token_data = json.loads(token_json_env)
+        creds = Credentials.from_authorized_user_info(token_data, SCOPES)
+
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+            # Update the env var with refreshed token (for logging)
+            logger.info("Gmail token refreshed successfully")
+
+        return build("gmail", "v1", credentials=creds)
+
+    # --- Option 2: Token from local file (local development) ---
     token_path = Path(os.environ.get("GMAIL_TOKEN_FILE", ".gmail_token.json"))
     creds_path = Path(os.environ.get("GMAIL_CREDENTIALS_FILE", ".gmail_credentials.json"))
 
@@ -38,11 +60,25 @@ def get_gmail_service():
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            if not creds_path.exists():
-                raise FileNotFoundError(f"Gmail credentials not found: {creds_path}")
-            flow = InstalledAppFlow.from_client_secrets_file(str(creds_path), SCOPES)
+            # --- Option 3: Credentials from env var ---
+            creds_json_env = os.environ.get("GMAIL_CREDENTIALS_JSON", "")
+            if creds_json_env:
+                import tempfile
+                with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+                    f.write(creds_json_env)
+                    tmp_path = f.name
+                flow = InstalledAppFlow.from_client_secrets_file(tmp_path, SCOPES)
+                os.unlink(tmp_path)
+            elif creds_path.exists():
+                flow = InstalledAppFlow.from_client_secrets_file(str(creds_path), SCOPES)
+            else:
+                raise FileNotFoundError(
+                    "Gmail credentials not found. Set GMAIL_TOKEN_JSON env var "
+                    "or provide .gmail_credentials.json file."
+                )
             creds = flow.run_local_server(port=0)
 
+        # Save refreshed token locally
         with open(token_path, "w") as f:
             f.write(creds.to_json())
 
@@ -63,18 +99,19 @@ def create_email(sender: str, to: list[str], subject: str, html_body: str) -> di
 
 async def send_newsletter(state: NewsletterState) -> dict:
     """Send newsletters via Gmail API."""
+    import asyncio
+
     newsletters = state.get("newsletters", {})
     date_str = state.get("date_str", datetime.now().strftime("%Y%m%d"))
     sender = os.environ.get("GMAIL_SENDER", "skenbizst@gmail.com")
     send_results: dict[str, bool] = {}
 
-    # Load recipients from database or environment
-    # In SaaS mode, recipients come from the settings API
+    # Load recipients from environment
     default_recipients = os.environ.get("DEFAULT_RECIPIENTS", "").split(",")
     default_recipients = [r.strip() for r in default_recipients if r.strip()]
 
     try:
-        service = get_gmail_service()
+        service = await asyncio.to_thread(get_gmail_service)
     except Exception as e:
         logger.error(f"Gmail auth failed: {e}")
         return {
@@ -92,7 +129,9 @@ async def send_newsletter(state: NewsletterState) -> dict:
 
         try:
             message = create_email(sender, recipients, subject, html)
-            service.users().messages().send(userId="me", body=message).execute()
+            await asyncio.to_thread(
+                service.users().messages().send(userId="me", body=message).execute
+            )
             send_results[country] = True
             logger.info(f"[{country}] Email sent to {len(recipients)} recipients")
         except Exception as e:
