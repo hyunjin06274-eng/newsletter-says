@@ -96,12 +96,11 @@ def _esc(text: str) -> str:
 
 
 def _build_article_card(article: dict, idx: int) -> str:
-    """Build a single article card HTML."""
+    """Build a single article card HTML with score-based visual emphasis."""
     score = article.get("score", 0)
     badge_text, badge_color, badge_bg = SCORE_BADGES.get(
         min(max(score, 2), 5), ("★★☆☆☆", "#6B7280", "#F3F4F6")
     )
-    # Prefer Korean title, fallback to original
     title = _esc(article.get("title_kr", article.get("title", "Untitled")))
     summary = _esc(article.get("summary_kr", article.get("snippet", "")))
     source = _esc(article.get("source", ""))
@@ -109,33 +108,52 @@ def _build_article_card(article: dict, idx: int) -> str:
     url_valid = article.get("url_valid", True)
     date = _esc(article.get("published_date", ""))
 
-    # Title: linked if URL is valid, plain text otherwise
     if url_valid and url and url != "#":
         title_html = f'<a href="{url}" style="color:{NAVY};font-size:15px;font-weight:700;text-decoration:none;line-height:1.5" target="_blank">{title}</a>'
-        source_link = f' · <a href="{url}" style="color:#6B7280;text-decoration:underline;font-size:11px" target="_blank">원문보기</a>'
+        source_link = f' · <a href="{url}" style="color:#3B82F6;text-decoration:none;font-size:11px;font-weight:600" target="_blank">원문보기 →</a>'
     else:
         title_html = f'<span style="color:{NAVY};font-size:15px;font-weight:700;line-height:1.5">{title}</span>'
         source_link = ""
 
+    # Score 5 gets highlighted card with gold left border
+    if score >= 5:
+        card_bg = "#FFFBEB"
+        left_border = f"border-left:4px solid #F59E0B;"
+        hot_tag = '<span style="display:inline-block;background:#DC2626;color:#fff;font-size:10px;padding:1px 6px;border-radius:3px;font-weight:700;margin-left:6px;vertical-align:middle">HOT</span>'
+    elif score >= 4:
+        card_bg = "#F8FAFC"
+        left_border = f"border-left:3px solid #3B82F6;"
+        hot_tag = ""
+    else:
+        card_bg = "#ffffff"
+        left_border = ""
+        hot_tag = ""
+
     return f"""<tr>
-<td style="padding:18px 20px;border-bottom:1px solid #f0f0f0">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0">
-  <tr><td>
-    <span style="display:inline-block;background-color:{badge_bg};color:{badge_color};font-size:11px;padding:3px 10px;border-radius:12px;font-weight:600;letter-spacing:0.5px">{badge_text} {score}</span>
-  </td></tr>
-  <tr><td style="padding-top:8px">
-    {title_html}
-  </td></tr>
-  <tr><td style="padding-top:8px">
-    <span style="font-size:13px;color:#4B5563;line-height:1.7">{summary}</span>
-  </td></tr>
-  <tr><td style="padding-top:8px">
-    <span style="font-size:11px;color:#9CA3AF">{source}{' | ' + date if date else ''}{source_link}</span>
-    {_build_related_sources(article)}
+<td style="padding:0">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:{card_bg};{left_border}">
+  <tr><td style="padding:18px 20px">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr><td>
+      <span style="display:inline-block;background-color:{badge_bg};color:{badge_color};font-size:10px;padding:3px 10px;border-radius:12px;font-weight:700;letter-spacing:0.5px">{badge_text}</span>
+      {hot_tag}
+    </td></tr>
+    <tr><td style="padding-top:8px">
+      {title_html}
+    </td></tr>
+    <tr><td style="padding-top:8px">
+      <span style="font-size:13px;color:#4B5563;line-height:1.75;display:block">{summary}</span>
+    </td></tr>
+    <tr><td style="padding-top:10px">
+      <span style="font-size:11px;color:#9CA3AF">{source}{' · ' + date if date else ''}{source_link}</span>
+      {_build_related_sources(article)}
+    </td></tr>
+    </table>
   </td></tr>
   </table>
 </td>
-</tr>"""
+</tr>
+<tr><td style="height:1px;background:#E5E7EB;font-size:1px">&nbsp;</td></tr>"""
 
 
 def _build_related_sources(article: dict) -> str:
@@ -237,9 +255,16 @@ def build_newsletter_html(country: str, articles: list, days: int, insights: lis
                 insights.append(summary[:120])
 
     insights_html = ""
-    for ins in insights[:5]:
-        insights_html += f"""<tr><td style="padding:6px 0;font-size:14px;color:#374151;line-height:1.6">
-  <span style="color:{BRAND_RED};font-weight:700;margin-right:6px">▶</span>{_esc(ins)}
+    insight_icons = ["🔥", "📈", "⚡", "🎯", "🔍"]
+    for i, ins in enumerate(insights[:5]):
+        icon = insight_icons[i] if i < len(insight_icons) else "▶"
+        insights_html += f"""<tr><td style="padding:8px 0">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr>
+    <td width="30" valign="top" style="padding-top:2px"><span style="font-size:16px">{icon}</span></td>
+    <td style="padding-left:8px;font-size:14px;color:#374151;line-height:1.65">{_esc(ins)}</td>
+  </tr>
+  </table>
 </td></tr>"""
 
     # Build recommendations
