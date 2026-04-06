@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 const COUNTRY_FLAGS: Record<string, string> = {
   KR: "\uD83C\uDDF0\uD83C\uDDF7",
@@ -46,19 +46,30 @@ interface Run {
   created_at: string;
 }
 
+type RunState = "idle" | "starting" | "running" | "error";
+
 export default function Dashboard() {
   const [runs, setRuns] = useState<Run[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [startingRun, setStartingRun] = useState(false);
-  const [selectedCountries, setSelectedCountries] = useState<string[]>(
-    Object.keys(COUNTRY_FLAGS)
-  );
+  const [runState, setRunState] = useState<RunState>("idle");
+  const [errorMsg, setErrorMsg] = useState("");
+  const [apiConnected, setApiConnected] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     fetchRuns();
-    const interval = setInterval(fetchRuns, 5000);
-    return () => clearInterval(interval);
+    pollRef.current = setInterval(fetchRuns, 5000);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);
+
+  // Sync runState with active runs
+  useEffect(() => {
+    const active = runs.find((r) => r.status === "running");
+    if (active && runState !== "starting") {
+      setRunState("running");
+    } else if (!active && runState === "running") {
+      setRunState("idle");
+    }
+  }, [runs]);
 
   async function fetchRuns() {
     try {
@@ -66,45 +77,39 @@ export default function Dashboard() {
       if (res.ok) {
         const data = await res.json();
         setRuns(data.runs || []);
+        setApiConnected(true);
       }
     } catch {
-      // API not available yet
+      setApiConnected(false);
     }
   }
 
-  async function startNewRun() {
-    setStartingRun(true);
+  async function handleStartRun() {
+    setRunState("starting");
+    setErrorMsg("");
+
     try {
       const res = await fetch("/api/runs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ countries: selectedCountries, days: 30 }),
+        body: JSON.stringify({ countries: Object.keys(COUNTRY_FLAGS), days: 30 }),
       });
+
       if (res.ok) {
+        setRunState("running");
+        // Refresh runs list
         await fetchRuns();
-        // Keep startingRun=true — activeRun will take over the button state
-        // Only reset if no active run found after refresh
-        setTimeout(async () => {
-          await fetchRuns();
-          setStartingRun(false);
-        }, 2000);
-        return;
+      } else {
+        setRunState("error");
+        setErrorMsg("API returned error. Check backend server.");
       }
-    } catch (e) {
-      console.error("Failed to start run:", e);
+    } catch {
+      setRunState("error");
+      setErrorMsg("Backend not reachable. Start the server: uvicorn backend.main:app --port 8000");
     }
-    setStartingRun(false);
   }
 
-  function toggleCountry(code: string) {
-    setSelectedCountries((prev) =>
-      prev.includes(code)
-        ? prev.filter((c) => c !== code)
-        : [...prev, code]
-    );
-  }
-
-  const activeRun = runs.find((r) => r.status === "running");
+  const isRunning = runState === "starting" || runState === "running";
 
   return (
     <div className="space-y-8">
@@ -113,25 +118,33 @@ export default function Dashboard() {
         <div>
           <h1 className="text-3xl font-bold">Dashboard</h1>
           <p className="text-gray-400 mt-1">SK Enmove Global MI Newsletter Pipeline</p>
-          <p className="text-gray-600 text-xs mt-1">Schedule: Every Tuesday 09:00 KST</p>
+          <div className="flex items-center gap-3 mt-2">
+            <span className="text-gray-600 text-xs">Schedule: Every Tuesday 09:00 KST</span>
+            <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${
+              apiConnected ? "bg-green-900/40 text-green-400" : "bg-red-900/40 text-red-400"
+            }`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${apiConnected ? "bg-green-400" : "bg-red-400"}`} />
+              {apiConnected ? "API Connected" : "API Offline"}
+            </span>
+          </div>
         </div>
-        <div className="flex gap-3">
+
         <button
-          onClick={() => startNewRun()}
-          disabled={startingRun || !!activeRun}
+          onClick={handleStartRun}
+          disabled={isRunning}
           className={`px-6 py-3 text-white rounded-lg font-medium transition-all flex items-center gap-2 ${
-            (startingRun || activeRun)
+            isRunning
               ? "bg-blue-600 cursor-not-allowed"
               : "bg-red-600 hover:bg-red-700 hover:scale-105"
           }`}
         >
-          {(startingRun || activeRun) ? (
+          {isRunning ? (
             <>
               <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
-              Running...
+              {runState === "starting" ? "Starting..." : "Running..."}
             </>
           ) : (
             <>
@@ -143,56 +156,38 @@ export default function Dashboard() {
             </>
           )}
         </button>
-        <button
-          onClick={() => {
-            if (confirm("선택한 국가로 즉시 뉴스레터를 생성하고 발송하시겠습니까?")) {
-              startNewRun();
-            }
-          }}
-          disabled={startingRun || !!activeRun}
-          className="px-4 py-3 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-600 text-white rounded-lg font-medium transition-all text-sm flex items-center gap-2"
-        >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-          </svg>
-          One-time Send
-        </button>
-        </div>
       </div>
 
-      {/* Country Selection */}
-      <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
-        <h2 className="text-lg font-semibold mb-4">Target Countries</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-          {Object.entries(COUNTRY_FLAGS).map(([code, flag]) => (
+      {/* Error Banner */}
+      {runState === "error" && (
+        <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 flex items-start gap-3">
+          <span className="text-red-400 text-lg">!</span>
+          <div>
+            <p className="text-red-300 font-medium text-sm">Run failed to start</p>
+            <p className="text-red-400/70 text-xs mt-1">{errorMsg}</p>
             <button
-              key={code}
-              onClick={() => toggleCountry(code)}
-              className={`p-3 rounded-lg border transition-all text-center ${
-                selectedCountries.includes(code)
-                  ? "border-red-500 bg-red-900/20 text-white"
-                  : "border-gray-700 bg-gray-800/50 text-gray-500"
-              }`}
+              onClick={() => { setRunState("idle"); setErrorMsg(""); }}
+              className="text-xs text-red-400 underline mt-2"
             >
-              <span className="text-2xl block">{flag}</span>
-              <span className="text-xs mt-1 block">{COUNTRY_NAMES[code]}</span>
+              Dismiss
             </button>
-          ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Active Run Status */}
-      {activeRun && (
+      {runs.find((r) => r.status === "running") && (
         <div className="bg-gray-900 rounded-xl p-6 border border-blue-800/50">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse" />
             <h2 className="text-lg font-semibold">Active Run</h2>
-            <span className="text-sm text-gray-400">{activeRun.id.slice(0, 8)}...</span>
+            <span className="text-sm text-gray-400">
+              {runs.find((r) => r.status === "running")!.id.slice(0, 8)}...
+            </span>
           </div>
-
-          {/* Phase Progress */}
           <div className="flex gap-1 mt-4">
             {Object.entries(PHASE_LABELS).map(([phase, label]) => {
+              const activeRun = runs.find((r) => r.status === "running")!;
               const isActive = activeRun.current_phase === phase;
               const isPast =
                 Object.keys(PHASE_LABELS).indexOf(phase) <
@@ -216,6 +211,27 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* Target Countries (read-only, from Settings) */}
+      <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold">Target Countries</h2>
+          <a href="/settings" className="text-xs text-blue-400 hover:text-blue-300">
+            Edit in Settings &rarr;
+          </a>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+          {Object.entries(COUNTRY_FLAGS).map(([code, flag]) => (
+            <div
+              key={code}
+              className="p-3 rounded-lg border border-gray-700 bg-gray-800/50 text-center"
+            >
+              <span className="text-2xl block">{flag}</span>
+              <span className="text-xs mt-1 block text-gray-400">{COUNTRY_NAMES[code]}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Recent Runs */}
       <div className="bg-gray-900 rounded-xl border border-gray-800">
         <div className="p-6 border-b border-gray-800">
@@ -224,7 +240,9 @@ export default function Dashboard() {
         <div className="divide-y divide-gray-800">
           {runs.length === 0 ? (
             <div className="p-12 text-center text-gray-500">
-              No runs yet. Click &quot;Start New Run&quot; to begin.
+              {apiConnected
+                ? 'No runs yet. Click "Start New Run" to begin.'
+                : "Connect backend server to see run history."}
             </div>
           ) : (
             runs.map((run) => (
