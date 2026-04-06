@@ -101,26 +101,36 @@ def _build_article_card(article: dict, idx: int) -> str:
     badge_text, badge_color, badge_bg = SCORE_BADGES.get(
         min(max(score, 2), 5), ("★★☆☆☆", "#6B7280", "#F3F4F6")
     )
-    title = _esc(article.get("title", "Untitled"))
+    # Prefer Korean title, fallback to original
+    title = _esc(article.get("title_kr", article.get("title", "Untitled")))
     summary = _esc(article.get("summary_kr", article.get("snippet", "")))
     source = _esc(article.get("source", ""))
     url = article.get("url", "#")
+    url_valid = article.get("url_valid", True)
     date = _esc(article.get("published_date", ""))
 
+    # Title: linked if URL is valid, plain text otherwise
+    if url_valid and url and url != "#":
+        title_html = f'<a href="{url}" style="color:{NAVY};font-size:15px;font-weight:700;text-decoration:none;line-height:1.5" target="_blank">{title}</a>'
+        source_link = f' · <a href="{url}" style="color:#6B7280;text-decoration:underline;font-size:11px" target="_blank">원문보기</a>'
+    else:
+        title_html = f'<span style="color:{NAVY};font-size:15px;font-weight:700;line-height:1.5">{title}</span>'
+        source_link = ""
+
     return f"""<tr>
-<td style="padding:16px 20px;border-bottom:1px solid #f0f0f0">
+<td style="padding:18px 20px;border-bottom:1px solid #f0f0f0">
   <table width="100%" cellpadding="0" cellspacing="0" border="0">
   <tr><td>
-    <span style="display:inline-block;background-color:{badge_bg};color:{badge_color};font-size:11px;padding:2px 10px;border-radius:12px;font-weight:600;letter-spacing:0.5px">{badge_text} {score}</span>
+    <span style="display:inline-block;background-color:{badge_bg};color:{badge_color};font-size:11px;padding:3px 10px;border-radius:12px;font-weight:600;letter-spacing:0.5px">{badge_text} {score}</span>
   </td></tr>
-  <tr><td style="padding-top:6px">
-    <a href="{url}" style="color:{NAVY};font-size:15px;font-weight:700;text-decoration:none;line-height:1.5" target="_blank">{title}</a>
+  <tr><td style="padding-top:8px">
+    {title_html}
   </td></tr>
-  <tr><td style="padding-top:6px">
-    <span style="font-size:13px;color:#555555;line-height:1.6">{summary}</span>
+  <tr><td style="padding-top:8px">
+    <span style="font-size:13px;color:#4B5563;line-height:1.7">{summary}</span>
   </td></tr>
-  <tr><td style="padding-top:6px">
-    <span style="font-size:11px;color:#9CA3AF">{source}{' | ' + date if date else ''}</span>
+  <tr><td style="padding-top:8px">
+    <span style="font-size:11px;color:#9CA3AF">{source}{' | ' + date if date else ''}{source_link}</span>
   </td></tr>
   </table>
 </td>
