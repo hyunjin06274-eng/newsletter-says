@@ -179,6 +179,32 @@ def _build_sector_block(sector: str, articles: list) -> str:
 </tr>"""
 
 
+def _build_kpi_bar(articles: list, sectors: dict) -> str:
+    """Build KPI dashboard bar with key metrics."""
+    total = len(articles)
+    avg_score = sum(a.get("score", 0) for a in articles) / max(total, 1)
+    top_sector = max(sectors.items(), key=lambda x: len(x[1]))[0] if sectors else "N/A"
+    high_priority = sum(1 for a in articles if a.get("score", 0) >= 4)
+
+    sector_icon = SECTOR_ICONS.get(top_sector, ("📰", "#6B7280", ""))[0]
+
+    cells = [
+        (f"{total}", "분석 기사", "#2563EB"),
+        (f"{avg_score:.1f}", "평균 중요도", "#D97706"),
+        (f"{high_priority}", "긴급 뉴스", "#DC2626"),
+        (f"{sector_icon} {top_sector}", "핵심 섹터", "#059669"),
+    ]
+
+    html = ""
+    for value, label, color in cells:
+        html += f"""<td width="25%" align="center" style="padding:16px 8px;border-right:1px solid #E2E8F0">
+  <span style="display:block;font-size:20px;font-weight:800;color:{color}">{value}</span>
+  <span style="display:block;font-size:11px;color:#64748B;margin-top:2px">{label}</span>
+</td>"""
+
+    return html
+
+
 def build_newsletter_html(country: str, articles: list, days: int, insights: list[str] = None, recommendations: list[str] = None) -> str:
     """Build a complete professional newsletter HTML."""
     name = COUNTRY_NAMES.get(country, country)
@@ -224,11 +250,17 @@ def build_newsletter_html(country: str, articles: list, days: int, insights: lis
             f"전방산업 수요 변화를 반영한 제품 포트폴리오 최적화",
         ]
 
+    # Priority labels for recommendations
+    priority_labels = ["🔴 최우선", "🟠 중요", "🟡 주목", "🔵 참고", "⚪ 모니터링"]
+
     recs_html = ""
-    for i, rec in enumerate(recommendations[:5], 1):
-        recs_html += f"""<tr><td style="padding:10px 0;font-size:14px;color:#374151;line-height:1.6">
-  <span style="display:inline-block;background:{NAVY};color:#fff;width:24px;height:24px;border-radius:50%;text-align:center;line-height:24px;font-size:12px;font-weight:700;margin-right:10px">{i}</span>
-  {_esc(rec)}
+    for i, rec in enumerate(recommendations[:5], 0):
+        prio = priority_labels[i] if i < len(priority_labels) else ""
+        recs_html += f"""<tr><td style="padding:12px 0;font-size:14px;color:#374151;line-height:1.6;border-bottom:1px solid #E8ECF4">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+    <td width="28" valign="top"><span style="display:inline-block;background:{NAVY};color:#fff;width:24px;height:24px;border-radius:50%;text-align:center;line-height:24px;font-size:12px;font-weight:700">{i+1}</span></td>
+    <td style="padding-left:10px"><span style="font-size:11px;color:#6B7280">{prio}</span><br><span style="font-weight:600">{_esc(rec)}</span></td>
+  </tr></table>
 </td></tr>"""
 
     total_articles = len(articles)
@@ -265,6 +297,17 @@ def build_newsletter_html(country: str, articles: list, days: int, insights: lis
   <tr><td align="center" style="padding-top:10px">
     <span style="color:#8BA4C4;font-size:13px">{today} | 최근 {days}일 동향 분석 | {total_articles}건 분석 · {total_sources}개 소스</span>
   </td></tr>
+  </table>
+</td>
+</tr>
+
+<!-- ═══ KPI DASHBOARD ═══ -->
+<tr>
+<td style="padding:0">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F1F5F9">
+  <tr>
+    {_build_kpi_bar(articles, sectors)}
+  </tr>
   </table>
 </td>
 </tr>
