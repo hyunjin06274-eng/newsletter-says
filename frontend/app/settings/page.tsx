@@ -45,30 +45,62 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
+  const STORAGE_KEY = "newsletter-saas-settings";
+
+  function loadFromLocal(): Settings | null {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  }
+
+  function saveToLocal(data: Partial<Settings["schedule"]>) {
+    try {
+      const current = loadFromLocal();
+      const merged: Settings = {
+        schedule: { ...current?.schedule, ...data } as Settings["schedule"],
+        api_keys_configured: current?.api_keys_configured || {},
+        gmail_authenticated: current?.gmail_authenticated || false,
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+    } catch {}
+  }
+
+  function applySettings(data: Settings) {
+    setSettings(data);
+    setFrequency(data.schedule.frequency);
+    setDayOfWeek(data.schedule.day_of_week);
+    setTime(data.schedule.time);
+    setActiveCountries(data.schedule.countries);
+    setIsActive(data.schedule.is_active);
+
+    const r: Record<string, string> = {};
+    for (const cr of data.schedule.country_recipients || []) {
+      r[cr.country] = cr.recipients.join(", ");
+    }
+    setRecipients(r);
+  }
+
   useEffect(() => {
     fetchSettings();
   }, []);
 
   async function fetchSettings() {
+    // 1. Try API first
     try {
       const res = await fetch("/api/settings");
       if (res.ok) {
         const data: Settings = await res.json();
-        setSettings(data);
-        setFrequency(data.schedule.frequency);
-        setDayOfWeek(data.schedule.day_of_week);
-        setTime(data.schedule.time);
-        setActiveCountries(data.schedule.countries);
-        setIsActive(data.schedule.is_active);
-
-        const r: Record<string, string> = {};
-        for (const cr of data.schedule.country_recipients || []) {
-          r[cr.country] = cr.recipients.join(", ");
-        }
-        setRecipients(r);
+        applySettings(data);
+        saveToLocal(data.schedule); // sync to localStorage
+        return;
       }
-    } catch {
-      // API not available
+    } catch {}
+
+    // 2. Fallback: load from localStorage
+    const local = loadFromLocal();
+    if (local) {
+      applySettings(local);
     }
   }
 
@@ -82,17 +114,23 @@ export default function SettingsPage() {
           recipients: emailStr.split(",").map((e) => e.trim()).filter(Boolean),
         }));
 
+      const settingsPayload = {
+        frequency,
+        day_of_week: dayOfWeek,
+        time,
+        countries: activeCountries,
+        is_active: isActive,
+        country_recipients: countryRecipients,
+      };
+
+      // Always save to localStorage
+      saveToLocal(settingsPayload);
+
+      // Also try API
       await fetch("/api/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          frequency,
-          day_of_week: dayOfWeek,
-          time,
-          countries: activeCountries,
-          is_active: isActive,
-          country_recipients: countryRecipients,
-        }),
+        body: JSON.stringify(settingsPayload),
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
