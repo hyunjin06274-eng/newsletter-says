@@ -131,10 +131,26 @@ def _build_article_card(article: dict, idx: int) -> str:
   </td></tr>
   <tr><td style="padding-top:8px">
     <span style="font-size:11px;color:#9CA3AF">{source}{' | ' + date if date else ''}{source_link}</span>
+    {_build_related_sources(article)}
   </td></tr>
   </table>
 </td>
 </tr>"""
+
+
+def _build_related_sources(article: dict) -> str:
+    """Show related sources if article was grouped from multiple."""
+    related = article.get("related_sources", [])
+    if not related:
+        return ""
+    links = []
+    for r in related[:3]:
+        src = _esc(r.get("source", ""))
+        if src:
+            links.append(src)
+    if links:
+        return f'<br><span style="font-size:10px;color:#B0B8C4">관련: {", ".join(links)}</span>'
+    return ""
 
 
 def _build_sector_block(sector: str, articles: list) -> str:
