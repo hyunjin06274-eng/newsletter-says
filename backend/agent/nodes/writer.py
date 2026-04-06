@@ -95,6 +95,21 @@ def _esc(text: str) -> str:
     return html_module.escape(str(text)) if text else ""
 
 
+def _format_date(date_str: str) -> str:
+    """Convert RSS date to clean Korean format."""
+    if not date_str:
+        return ""
+    from email.utils import parsedate_to_datetime
+    try:
+        dt = parsedate_to_datetime(date_str)
+        return dt.strftime("%Y.%m.%d")
+    except Exception:
+        # Already formatted or unknown format
+        if "." in date_str and len(date_str) <= 12:
+            return date_str
+        return date_str[:10] if len(date_str) > 10 else date_str
+
+
 def _build_article_card(article: dict, idx: int) -> str:
     """Build a single article card HTML with score-based visual emphasis."""
     score = article.get("score", 0)
@@ -106,7 +121,7 @@ def _build_article_card(article: dict, idx: int) -> str:
     source = _esc(article.get("source", ""))
     url = article.get("url", "#")
     url_valid = article.get("url_valid", True)
-    date = _esc(article.get("published_date", ""))
+    date = _format_date(article.get("published_date", ""))
 
     if url_valid and url and url != "#":
         title_html = f'<a href="{url}" style="color:{NAVY};font-size:15px;font-weight:700;text-decoration:none;line-height:1.5" target="_blank">{title}</a>'
