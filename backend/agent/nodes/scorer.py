@@ -10,20 +10,33 @@ from backend.agent.state import NewsletterState, Article
 logger = logging.getLogger(__name__)
 
 SCORING_PROMPT = """You are an MI analyst for SK Enmove, a lubricant company.
-Score this article on a scale of 0-5 for relevance to lubricant finished product sales strategy.
+Score this article on a scale of 0-5 for relevance to FINISHED lubricant product sales strategy.
+
+The core question: "Does this news affect how SK Enmove sells lubricants?"
 
 Scoring criteria:
-- 5: Direct competitor activity (new product, promotion, channel strategy)
-- 4: Lubricant market regulation/policy change, OEM specification update
-- 3: Vehicle sales/EV trends directly affecting lubricant demand
-- 2: Supply chain/crude oil/base oil affecting lubricant cost
-- 1: General industry news with indirect relevance
-- 0: Irrelevant (crypto, real estate, unrelated)
+- 5: Direct competitor activity — new lubricant product launch, pricing change, promotion, distribution channel expansion, OEM partnership
+- 4: Lubricant regulation/policy — API/ACEA/ILSAC specification update, import tariff change, environmental regulation affecting lubricant formulation
+- 3: Forward industry trends DIRECTLY affecting lubricant demand:
+     * Vehicle market: EV transition pace (affects ICE oil demand), hybrid growth (still needs oil), new car sales volume
+     * Commercial vehicle/truck/bus fleet expansion (HDDO demand)
+     * Marine/shipping fleet changes (marine lubricant demand)
+     * Construction/mining equipment market (industrial lubricant demand)
+     * Manufacturing/factory machinery trends (cutting fluid, hydraulic oil)
+     * Motorcycle market growth in SEA (MCO demand)
+     * Agricultural machinery/tractor market
+- 2: Crude oil/base oil pricing trends affecting lubricant manufacturing cost
+     * Refinery capacity changes impacting base oil supply
+     * Group II/III base oil market shifts
+- 1: Tangentially related — only if "anyone would obviously see the connection" to lubricants
+- 0: Irrelevant — crypto, real estate, stock market, generic politics, entertainment, food, fashion
 
-Rules:
-- EV-only oil articles: max 2 points
-- Base oil-only articles: max 1 point
-- Must relate to finished lubricant product sales
+STRICT EXCLUSION rules:
+- EV-only battery/charging articles with NO mention of lubricant/oil demand impact: score 0
+- Pure stock market / financial instrument news: score 0
+- Base oil-only upstream articles with no downstream sales implication: max 1 point
+- Generic CSR/ESG/sustainability fluff: score 0
+- Paid market research report previews (Mordor Intelligence, Allied Market Research, etc.): score 0
 
 Article:
 Title: {title}
@@ -32,12 +45,23 @@ Source: {source}
 Country: {country}
 Domain: {domain}
 
-Respond in JSON: {{"score": N, "sector": "윤활유동향|경쟁사활동|전방산업동향|윤활유규제", "reason": "brief reason", "tags": ["tag1", "tag2"]}}
+Respond in JSON: {{"score": N, "sector": "윤활유동향|경쟁사활동|전방산업동향|윤활유규제", "reason": "brief Korean reason explaining sales relevance", "tags": ["tag1", "tag2"]}}
 """
 
 NEGATIVE_KEYWORDS = [
-    "bitcoin", "cryptocurrency", "stock market", "dow jones", "nasdaq",
-    "real estate", "부동산", "smartkarma", "grand view research",
+    # Finance / stock
+    "bitcoin", "cryptocurrency", "crypto", "dogecoin", "stock market",
+    "dow jones", "s&p 500", "nasdaq", "wall street", "forex",
+    "주식", "코인", "가상화폐",
+    # Real estate
+    "real estate", "property price", "부동산", "집값", "아파트",
+    # Paid research
+    "smartkarma", "grand view research", "mordor intelligence",
+    "allied market research", "technavio", "imarc group", "indexbox",
+    # Pure entertainment
+    "celebrity", "entertainment", "k-pop", "drama",
+    # Medical
+    "한의과", "진료비", "의료비",
 ]
 
 

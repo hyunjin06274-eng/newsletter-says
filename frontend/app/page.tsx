@@ -78,7 +78,7 @@ export default function Dashboard() {
       const res = await fetch("/api/runs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ countries: selectedCountries }),
+        body: JSON.stringify({ countries: selectedCountries, days: 30 }),
       });
       if (res.ok) {
         fetchRuns();

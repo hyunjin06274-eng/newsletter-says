@@ -40,6 +40,7 @@ export default function SettingsPage() {
   const [time, setTime] = useState("10:00");
   const [activeCountries, setActiveCountries] = useState<string[]>([]);
   const [isActive, setIsActive] = useState(true);
+  const [days, setDays] = useState(30);
   const [recipients, setRecipients] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -144,7 +145,7 @@ export default function SettingsPage() {
           </label>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm text-gray-400 mb-2">Frequency</label>
             <select
@@ -170,13 +171,27 @@ export default function SettingsPage() {
             </select>
           </div>
           <div>
-            <label className="block text-sm text-gray-400 mb-2">Time</label>
+            <label className="block text-sm text-gray-400 mb-2">Time (KST)</label>
             <input
               type="time"
               value={time}
               onChange={(e) => setTime(e.target.value)}
               className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
             />
+          </div>
+          <div>
+            <label className="block text-sm text-gray-400 mb-2">Collection Period</label>
+            <select
+              value={days}
+              onChange={(e) => setDays(Number(e.target.value))}
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
+            >
+              <option value={7}>Last 7 days</option>
+              <option value={14}>Last 14 days</option>
+              <option value={30}>Last 30 days</option>
+              <option value={60}>Last 60 days</option>
+              <option value={90}>Last 90 days</option>
+            </select>
           </div>
         </div>
       </div>
