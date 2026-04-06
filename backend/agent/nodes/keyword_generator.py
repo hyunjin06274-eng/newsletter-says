@@ -55,7 +55,8 @@ async def generate_keywords(state: NewsletterState) -> dict:
                     country_lang=ctx["lang"],
                     competitors=", ".join(ctx["competitors"]),
                 )
-                response = model.generate_content(prompt)
+                import asyncio
+                response = await asyncio.to_thread(model.generate_content, prompt)
                 text = response.text.strip()
                 # Extract JSON array from response
                 if "[" in text:

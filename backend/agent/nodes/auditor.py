@@ -52,8 +52,10 @@ async def audit_newsletter(state: NewsletterState) -> dict:
     for country, html in newsletters.items():
         if client:
             try:
+                import asyncio
                 prompt = AUDIT_PROMPT.format(html_preview=html[:3000])
-                response = client.messages.create(
+                response = await asyncio.to_thread(
+                    client.messages.create,
                     model="claude-sonnet-4-20250514",
                     max_tokens=500,
                     messages=[{"role": "user", "content": prompt}],

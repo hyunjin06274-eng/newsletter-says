@@ -110,9 +110,39 @@ export default function Dashboard() {
         <button
           onClick={startNewRun}
           disabled={startingRun || !!activeRun}
-          className="px-6 py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded-lg font-medium transition-colors"
+          className={`px-6 py-3 text-white rounded-lg font-medium transition-all flex items-center gap-2 ${
+            startingRun
+              ? "bg-yellow-600 cursor-wait"
+              : activeRun
+              ? "bg-blue-600 cursor-not-allowed animate-pulse"
+              : "bg-red-600 hover:bg-red-700 hover:scale-105"
+          }`}
         >
-          {startingRun ? "Starting..." : activeRun ? "Run in Progress" : "Start New Run"}
+          {startingRun ? (
+            <>
+              <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              Starting...
+            </>
+          ) : activeRun ? (
+            <>
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-white" />
+              </span>
+              Pipeline Running
+            </>
+          ) : (
+            <>
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Start New Run
+            </>
+          )}
         </button>
       </div>
 

@@ -85,6 +85,7 @@ def quick_filter(article: Article) -> bool:
 
 async def score_single_article(article: Article, client) -> Article:
     """Score a single article using Claude."""
+    import asyncio
     try:
         prompt = SCORING_PROMPT.format(
             title=article.get("title", ""),
@@ -94,7 +95,8 @@ async def score_single_article(article: Article, client) -> Article:
             domain=article.get("collection_domain", ""),
         )
 
-        response = client.messages.create(
+        response = await asyncio.to_thread(
+            client.messages.create,
             model="claude-sonnet-4-20250514",
             max_tokens=200,
             messages=[{"role": "user", "content": prompt}],

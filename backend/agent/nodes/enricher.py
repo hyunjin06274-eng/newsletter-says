@@ -103,13 +103,15 @@ async def enrich_snippets(state: NewsletterState) -> dict:
             # 3. LLM enrichment — Korean title + detailed summary
             if client:
                 try:
+                    import asyncio
                     prompt = ENRICH_PROMPT.format(
                         title=original_title,
                         snippet=article.get("snippet", ""),
                         source=article.get("source", ""),
                         country_name=country_name,
                     )
-                    response = client.messages.create(
+                    response = await asyncio.to_thread(
+                        client.messages.create,
                         model="claude-sonnet-4-20250514",
                         max_tokens=500,
                         messages=[{"role": "user", "content": prompt}],
