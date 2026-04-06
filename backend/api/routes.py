@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import uuid
 from datetime import datetime
 from typing import Optional
@@ -18,7 +19,7 @@ from backend.api.schemas import (
     ScheduleSettings, SettingsResponse, NewsletterPreview,
 )
 from backend.core.config import settings
-from backend.core.database import Run, ScheduleConfig, get_session
+from backend.core.database import Run, ScheduleConfig, get_session, async_session
 
 router = APIRouter(prefix="/api")
 
@@ -30,23 +31,26 @@ _active_runs: dict[str, dict] = {}
 
 async def run_pipeline(run_id: str, countries: list[str], date_str: str, days: int, dry_run: bool):
     """Execute the LangGraph pipeline in background."""
+    import traceback
     from backend.agent.graph import compile_graph, create_initial_state
 
     graph = compile_graph()
     initial_state = create_initial_state(countries=countries, date_str=date_str, days=days)
     initial_state["run_id"] = run_id
+    initial_state["max_audit_iterations"] = 3
 
     queue = _event_queues.get(run_id)
+    final_state = {}
 
     try:
         config = {"configurable": {"thread_id": run_id}}
         _active_runs[run_id] = {"status": "running", "phase": "keywords"}
 
         async for event in graph.astream(initial_state, config=config):
-            # Extract phase updates from events
             for node_name, node_output in event.items():
                 phase = node_output.get("current_phase", "")
                 events = node_output.get("events", [])
+                final_state.update(node_output)
 
                 _active_runs[run_id] = {
                     "status": "running",
@@ -59,11 +63,45 @@ async def run_pipeline(run_id: str, countries: list[str], date_str: str, days: i
                         await queue.put(e)
 
         _active_runs[run_id] = {"status": "completed", "phase": "complete"}
+
+        # Persist results to DB
+        try:
+            async with async_session() as session:
+                result = await session.execute(select(Run).where(Run.id == run_id))
+                db_run = result.scalar_one_or_none()
+                if db_run:
+                    db_run.status = "completed"
+                    db_run.current_phase = "complete"
+                    db_run.completed_at = datetime.utcnow()
+                    db_run.newsletter_html = json.dumps(final_state.get("newsletters", {}))
+                    db_run.audit_iterations = final_state.get("audit_iteration", 0)
+                    raw = final_state.get("raw_articles", {})
+                    scored = final_state.get("scored_articles", {})
+                    db_run.total_collected = sum(len(v) for v in raw.values())
+                    db_run.total_filtered = sum(len(v) for v in scored.values())
+                    db_run.total_sent = sum(1 for v in final_state.get("send_results", {}).values() if v)
+                    await session.commit()
+        except Exception as db_err:
+            logging.getLogger(__name__).error(f"DB persist failed: {db_err}")
+
         if queue:
             await queue.put({"type": "complete", "ts": datetime.now().isoformat()})
 
     except Exception as e:
+        logging.getLogger(__name__).error(f"Pipeline failed: {traceback.format_exc()}")
         _active_runs[run_id] = {"status": "failed", "phase": "error", "error": str(e)}
+
+        try:
+            async with async_session() as session:
+                result = await session.execute(select(Run).where(Run.id == run_id))
+                db_run = result.scalar_one_or_none()
+                if db_run:
+                    db_run.status = "failed"
+                    db_run.errors = json.dumps([str(e)])
+                    await session.commit()
+        except Exception:
+            pass
+
         if queue:
             await queue.put({"type": "error", "ts": datetime.now().isoformat(), "error": str(e)})
 
