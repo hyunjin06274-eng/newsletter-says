@@ -1,0 +1,43 @@
+# Newsletter SaaS Backend Dependencies
+
+# Web framework
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+sse-starlette>=2.0.0
+
+# LangGraph
+langgraph>=0.2.0
+langchain-core>=0.3.0
+langchain-anthropic>=0.3.0
+langchain-google-genai>=2.0.0
+
+# News collection
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+feedparser>=6.0.11
+trafilatura>=1.7.0
+
+# Translation
+deep-translator>=1.9.4
+
+# Gmail API
+google-api-python-client>=2.111.0
+google-auth>=2.25.0
+google-auth-httplib2>=0.2.0
+google-auth-oauthlib>=1.2.0
+
+# Data / Config
+pyyaml>=6.0.1
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# Database
+aiosqlite>=0.19.0
+sqlalchemy>=2.0.0
+
+# Utils
+python-dotenv>=1.0.0
+tenacity>=8.2.3
+python-dateutil>=2.8.2
+anthropic>=0.40.0
