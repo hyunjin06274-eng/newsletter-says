@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: newsletter-saas-api
+    runtime: python
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHONPATH
+        value: .
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: TAVILY_API_KEY
+        sync: false
+      - key: GMAIL_TOKEN_JSON
+        sync: false
+      - key: GMAIL_CREDENTIALS_JSON
+        sync: false
+      - key: GMAIL_SENDER
+        value: skenbizst@gmail.com
+      - key: DEFAULT_RECIPIENTS
+        sync: false
+      - key: FRONTEND_URL
+        value: https://frontend-gamma-eight-32.vercel.app
