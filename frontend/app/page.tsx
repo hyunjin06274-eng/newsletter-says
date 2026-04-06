@@ -81,7 +81,14 @@ export default function Dashboard() {
         body: JSON.stringify({ countries: selectedCountries, days: 30 }),
       });
       if (res.ok) {
-        fetchRuns();
+        await fetchRuns();
+        // Keep startingRun=true — activeRun will take over the button state
+        // Only reset if no active run found after refresh
+        setTimeout(async () => {
+          await fetchRuns();
+          setStartingRun(false);
+        }, 2000);
+        return;
       }
     } catch (e) {
       console.error("Failed to start run:", e);
@@ -113,28 +120,18 @@ export default function Dashboard() {
           onClick={() => startNewRun()}
           disabled={startingRun || !!activeRun}
           className={`px-6 py-3 text-white rounded-lg font-medium transition-all flex items-center gap-2 ${
-            startingRun
-              ? "bg-yellow-600 cursor-wait"
-              : activeRun
-              ? "bg-blue-600 cursor-not-allowed animate-pulse"
+            (startingRun || activeRun)
+              ? "bg-blue-600 cursor-not-allowed"
               : "bg-red-600 hover:bg-red-700 hover:scale-105"
           }`}
         >
-          {startingRun ? (
+          {(startingRun || activeRun) ? (
             <>
               <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
-              Starting...
-            </>
-          ) : activeRun ? (
-            <>
-              <span className="relative flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-white" />
-              </span>
-              Pipeline Running
+              Running...
             </>
           ) : (
             <>
