@@ -113,7 +113,7 @@ export default function Dashboard() {
         <div>
           <h1 className="text-3xl font-bold">Dashboard</h1>
           <p className="text-gray-400 mt-1">SK Enmove Global MI Newsletter Pipeline</p>
-          <p className="text-gray-600 text-xs mt-1">Schedule: Every Tuesday 08:00 KST</p>
+          <p className="text-gray-600 text-xs mt-1">Schedule: Every Tuesday 09:00 KST</p>
         </div>
         <div className="flex gap-3">
         <button

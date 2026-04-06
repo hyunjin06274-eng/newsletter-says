@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     default_days: int = 30
     max_audit_iterations: int = 3
     default_schedule_day: str = "Tuesday"
-    default_schedule_time: str = "08:00"
+    default_schedule_time: str = "09:00"
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
