@@ -41,10 +41,12 @@ class ScheduleConfig(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     frequency = Column(String(20), default="weekly")
-    day_of_week = Column(String(20), default="Wednesday")
-    time = Column(String(5), default="10:00")
+    day_of_week = Column(String(20), default="Tuesday")
+    time = Column(String(5), default="08:00")
     countries = Column(Text, default='["KR","RU","VN","TH","PH","PK"]')
     is_active = Column(Boolean, default=True)
+    country_recipients = Column(Text, default="[]")  # JSON: [{"country":"KR","recipients":["a@b.com"]}]
+    days = Column(Integer, default=30)
     updated_at = Column(DateTime, default=datetime.utcnow)
 
 

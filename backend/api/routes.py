@@ -265,12 +265,21 @@ async def get_settings(session: AsyncSession = Depends(get_session)):
 
     schedule = ScheduleSettings()
     if config:
+        try:
+            recipients = json.loads(config.country_recipients or "[]")
+        except (json.JSONDecodeError, TypeError):
+            recipients = []
+
         schedule = ScheduleSettings(
             frequency=config.frequency,
             day_of_week=config.day_of_week,
             time=config.time,
             countries=json.loads(config.countries),
             is_active=config.is_active,
+            country_recipients=[
+                {"country": r["country"], "recipients": r["recipients"]}
+                for r in recipients if isinstance(r, dict)
+            ],
         )
 
     return SettingsResponse(
@@ -287,15 +296,23 @@ async def get_settings(session: AsyncSession = Depends(get_session)):
 @router.put("/settings")
 async def update_settings(body: ScheduleSettings, session: AsyncSession = Depends(get_session)):
     """Update schedule and recipient settings."""
+    # Serialize recipients
+    recipients_json = json.dumps(
+        [{"country": cr.country, "recipients": cr.recipients}
+         for cr in body.country_recipients],
+        ensure_ascii=False,
+    ) if body.country_recipients else "[]"
+
     config = ScheduleConfig(
         frequency=body.frequency,
         day_of_week=body.day_of_week,
         time=body.time,
         countries=json.dumps(body.countries),
         is_active=body.is_active,
+        country_recipients=recipients_json,
         updated_at=datetime.utcnow(),
     )
     session.add(config)
     await session.commit()
 
-    return {"status": "ok", "message": "Settings updated"}
+    return {"status": "ok", "message": "Settings saved successfully"}
