@@ -78,7 +78,17 @@ COUNTRY_INFO = {
            "competitors": "PSO, Shell Pakistan, Attock Petroleum, Caltex Pakistan, Total Parco"},
 }
 
-GOOGLE_NEWS_RSS = "https://news.google.com/rss/search?q={query}&hl=en&gl={country}&ceid={country}:en"
+# when:{days}d restricts to recent articles only
+# Two variants: English and local language results
+GOOGLE_NEWS_RSS_EN = "https://news.google.com/rss/search?q={query}+when:{days}d&hl=en&gl={country}&ceid={country}:en"
+GOOGLE_NEWS_RSS_LOCAL = {
+    "KR": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=ko&gl=KR&ceid=KR:ko",
+    "RU": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=ru&gl=RU&ceid=RU:ru",
+    "VN": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=vi&gl=VN&ceid=VN:vi",
+    "TH": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=th&gl=TH&ceid=TH:th",
+    "PH": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=en&gl=PH&ceid=PH:en",
+    "PK": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=en&gl=PK&ceid=PK:en",
+}
 
 
 def generate_dynamic_queries(country: str, domain: str) -> list[str]:
@@ -115,26 +125,30 @@ def generate_dynamic_queries(country: str, domain: str) -> list[str]:
     return []
 
 
-def fetch_google_news_rss(query: str, country: str, max_results: int = 15) -> list[Article]:
-    """Fetch articles from Google News RSS feed."""
+def fetch_google_news_rss(query: str, country: str, max_results: int = 15, days: int = 30) -> list[Article]:
+    """Fetch articles from Google News RSS — both English and local language."""
     import feedparser
 
-    url = GOOGLE_NEWS_RSS.format(query=query.replace(" ", "+"), country=country)
+    urls = [GOOGLE_NEWS_RSS_EN.format(query=query.replace(" ", "+"), country=country, days=days)]
+    local_template = GOOGLE_NEWS_RSS_LOCAL.get(country)
+    if local_template:
+        urls.append(local_template.format(query=query.replace(" ", "+"), days=days))
     articles = []
 
-    try:
-        feed = feedparser.parse(url)
-        for entry in feed.entries[:max_results]:
-            articles.append(Article(
-                url=entry.get("link", ""),
-                title=entry.get("title", ""),
-                snippet=entry.get("summary", ""),
-                source=entry.get("source", {}).get("title", "Unknown"),
-                published_date=entry.get("published", ""),
-                country=country,
-            ))
-    except Exception as e:
-        logger.warning(f"RSS fetch failed for {query}/{country}: {e}")
+    for url in urls:
+        try:
+            feed = feedparser.parse(url)
+            for entry in feed.entries[:max_results]:
+                articles.append(Article(
+                    url=entry.get("link", ""),
+                    title=entry.get("title", ""),
+                    snippet=entry.get("summary", ""),
+                    source=entry.get("source", {}).get("title", "Unknown"),
+                    published_date=entry.get("published", ""),
+                    country=country,
+                ))
+        except Exception as e:
+            logger.warning(f"RSS fetch failed for {query}/{country}: {e}")
 
     return articles
 
@@ -150,7 +164,7 @@ async def collect_for_country_domain(
     for kw in keywords[:4]:
         for template in templates:
             query = template.format(keyword=kw)
-            results = fetch_google_news_rss(query, country, max_results=8)
+            results = fetch_google_news_rss(query, country, max_results=8, days=days)
             for article in results:
                 article["collection_domain"] = domain
             articles.extend(results)
@@ -158,7 +172,7 @@ async def collect_for_country_domain(
     # 2. LLM-generated dynamic queries (broader, more creative exploration)
     dynamic_queries = generate_dynamic_queries(country, domain)
     for query in dynamic_queries:
-        results = fetch_google_news_rss(query, country, max_results=10)
+        results = fetch_google_news_rss(query, country, max_results=10, days=days)
         for article in results:
             article["collection_domain"] = domain
             article["query_source"] = "dynamic_llm"

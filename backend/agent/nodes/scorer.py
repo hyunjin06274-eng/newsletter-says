@@ -68,7 +68,19 @@ NEGATIVE_KEYWORDS = [
 def quick_filter(article: Article) -> bool:
     """Fast negative keyword filter before LLM scoring."""
     text = f"{article.get('title', '')} {article.get('snippet', '')}".lower()
-    return not any(neg in text for neg in NEGATIVE_KEYWORDS)
+    if any(neg in text for neg in NEGATIVE_KEYWORDS):
+        return False
+    # Filter out market research report spam (preview/teaser pages)
+    report_spam = [
+        "market size", "market share", "market forecast", "market analysis",
+        "market report", "cagr", "billion by 20", "million by 20",
+        "research report", "industry report", "market outlook",
+        "시장 규모", "시장 전망", "시장 분석 보고서",
+    ]
+    spam_count = sum(1 for r in report_spam if r in text)
+    if spam_count >= 2:
+        return False  # Likely a paid research report preview
+    return True
 
 
 async def score_single_article(article: Article, client) -> Article:
