@@ -106,9 +106,11 @@ export default function Dashboard() {
         <div>
           <h1 className="text-3xl font-bold">Dashboard</h1>
           <p className="text-gray-400 mt-1">SK Enmove Global MI Newsletter Pipeline</p>
+          <p className="text-gray-600 text-xs mt-1">Schedule: Every Tuesday 08:00 KST</p>
         </div>
+        <div className="flex gap-3">
         <button
-          onClick={startNewRun}
+          onClick={() => startNewRun()}
           disabled={startingRun || !!activeRun}
           className={`px-6 py-3 text-white rounded-lg font-medium transition-all flex items-center gap-2 ${
             startingRun
@@ -144,6 +146,21 @@ export default function Dashboard() {
             </>
           )}
         </button>
+        <button
+          onClick={() => {
+            if (confirm("선택한 국가로 즉시 뉴스레터를 생성하고 발송하시겠습니까?")) {
+              startNewRun();
+            }
+          }}
+          disabled={startingRun || !!activeRun}
+          className="px-4 py-3 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-600 text-white rounded-lg font-medium transition-all text-sm flex items-center gap-2"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+          One-time Send
+        </button>
+        </div>
       </div>
 
       {/* Country Selection */}

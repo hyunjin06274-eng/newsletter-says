@@ -36,8 +36,8 @@ interface Settings {
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [frequency, setFrequency] = useState("weekly");
-  const [dayOfWeek, setDayOfWeek] = useState("Wednesday");
-  const [time, setTime] = useState("10:00");
+  const [dayOfWeek, setDayOfWeek] = useState("Tuesday");
+  const [time, setTime] = useState("08:00");
   const [activeCountries, setActiveCountries] = useState<string[]>([]);
   const [isActive, setIsActive] = useState(true);
   const [days, setDays] = useState(30);
