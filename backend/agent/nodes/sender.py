@@ -106,9 +106,33 @@ async def send_newsletter(state: NewsletterState) -> dict:
     sender = os.environ.get("GMAIL_SENDER", "skenbizst@gmail.com")
     send_results: dict[str, bool] = {}
 
-    # Load recipients from environment
-    default_recipients = os.environ.get("DEFAULT_RECIPIENTS", "").split(",")
-    default_recipients = [r.strip() for r in default_recipients if r.strip()]
+    # Load recipients from Supabase Settings
+    global_recipients = []
+    country_extra: dict[str, list[str]] = {}
+    try:
+        import requests as _req
+        supabase_url = os.environ.get("SUPABASE_URL", "")
+        supabase_key = os.environ.get("SUPABASE_KEY", "")
+        if supabase_url and supabase_key:
+            resp = _req.get(
+                f"{supabase_url}/rest/v1/settings?order=id.desc&limit=1&select=country_recipients",
+                headers={"apikey": supabase_key, "Authorization": f"Bearer {supabase_key}"},
+                timeout=10,
+            )
+            if resp.ok and resp.json():
+                for cr in resp.json()[0].get("country_recipients", []):
+                    if cr.get("country") == "ALL":
+                        global_recipients = cr.get("recipients", [])
+                    else:
+                        country_extra[cr["country"]] = cr.get("recipients", [])
+                logger.info(f"Loaded recipients: global={global_recipients}, extras={list(country_extra.keys())}")
+    except Exception as e:
+        logger.warning(f"Failed to load recipients from Supabase: {e}")
+
+    # Fallback to env
+    if not global_recipients:
+        env_recip = os.environ.get("DEFAULT_RECIPIENTS", "").split(",")
+        global_recipients = [r.strip() for r in env_recip if r.strip()]
 
     try:
         service = await asyncio.to_thread(get_gmail_service)
@@ -125,7 +149,17 @@ async def send_newsletter(state: NewsletterState) -> dict:
         country_name = COUNTRY_NAMES.get(country, country)
         subject = f"[SK엔무브 MI] {country_name} 윤활유 시장 동향 ({date_str[:4]}.{date_str[4:6]}.{date_str[6:]})"
 
-        recipients = default_recipients or ["admin@skenmove.com"]
+        # Merge global + country-specific recipients
+        recipients = list(global_recipients)
+        if country in country_extra:
+            recipients.extend(country_extra[country])
+        # Dedupe
+        recipients = list(dict.fromkeys(r for r in recipients if r))
+
+        if not recipients:
+            logger.warning(f"[{country}] No recipients configured, skipping")
+            send_results[country] = False
+            continue
 
         try:
             message = create_email(sender, recipients, subject, html)
@@ -133,7 +167,7 @@ async def send_newsletter(state: NewsletterState) -> dict:
                 service.users().messages().send(userId="me", body=message).execute
             )
             send_results[country] = True
-            logger.info(f"[{country}] Email sent to {len(recipients)} recipients")
+            logger.info(f"[{country}] Email sent to {recipients}")
         except Exception as e:
             logger.error(f"[{country}] Send failed: {e}")
             send_results[country] = False

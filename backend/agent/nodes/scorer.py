@@ -38,6 +38,14 @@ STRICT EXCLUSION rules:
 - Generic CSR/ESG/sustainability fluff: score 0
 - Paid market research report previews (Mordor Intelligence, Allied Market Research, etc.): score 0
 
+CRITICAL — COUNTRY RELEVANCE:
+Target country: {country}
+This article MUST be relevant to the {country} market specifically.
+- If the article is about a DIFFERENT country's market (e.g., Philippines article for Korea query): score 0
+- Global/industry-wide news is OK only if it directly impacts {country}
+- "Castrol Philippines" in a Korea newsletter = WRONG, score 0
+- Only score > 0 if the article genuinely belongs in a {country} market report
+
 Article:
 Title: {title}
 Snippet: {snippet}
@@ -45,7 +53,7 @@ Source: {source}
 Country: {country}
 Domain: {domain}
 
-Respond in JSON: {{"score": N, "sector": "윤활유동향|경쟁사활동|전방산업동향|윤활유규제", "reason": "brief Korean reason explaining sales relevance", "tags": ["tag1", "tag2"]}}
+Respond in JSON: {{"score": N, "country_match": true/false, "sector": "윤활유동향|경쟁사활동|전방산업동향|윤활유규제", "reason": "brief Korean reason", "tags": ["tag1", "tag2"]}}
 """
 
 NEGATIVE_KEYWORDS = [
@@ -105,7 +113,12 @@ async def score_single_article(article: Article, client) -> Article:
         text = response.content[0].text.strip()
         if "{" in text:
             data = json.loads(text[text.index("{"):text.rindex("}") + 1])
-            article["score"] = data.get("score", 0)
+            # Reject articles that don't match target country
+            if not data.get("country_match", True):
+                article["score"] = 0
+                article["score_reason"] = "Country mismatch"
+            else:
+                article["score"] = data.get("score", 0)
             article["tags"] = data.get("tags", [])
             article["sector"] = data.get("sector", "윤활유동향")
             article["score_reason"] = data.get("reason", "")
