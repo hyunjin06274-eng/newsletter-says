@@ -55,13 +55,17 @@ jobs:
 
       - name: Run newsletter pipeline
         run: |
-          PYTHONPATH=. python -c "
-          import asyncio, os, json
+          PYTHONPATH=. python -u -c "
+          import asyncio, os, json, sys, time
+
+          # Force unbuffered output
+          sys.stdout.reconfigure(line_buffering=True)
 
           from backend.agent.graph import compile_graph, create_initial_state
 
-          countries = os.environ.get('INPUT_COUNTRIES', 'KR,RU,VN,TH,PH,PK').split(',')
+          countries = os.environ.get('INPUT_COUNTRIES', 'KR').split(',')
           countries = [c.strip() for c in countries]
+          print(f'=== Starting pipeline for {countries} ===', flush=True)
 
           async def main():
               graph = compile_graph()
@@ -73,22 +77,35 @@ jobs:
                   for node_name, output in event.items():
                       phase = output.get('current_phase', '')
                       final.update(output)
-                      print(f'[{node_name}] Phase: {phase}')
 
-              # Save newsletters to file for artifact upload
+                      # Detailed logging per phase
+                      stats = ''
+                      if 'raw_articles' in output:
+                          stats = ' | '.join(f'{c}:{len(a)}' for c,a in output['raw_articles'].items())
+                          stats = f' articles=[{stats}]'
+                      if 'scored_articles' in output:
+                          stats = ' | '.join(f'{c}:{len(a)}' for c,a in output['scored_articles'].items())
+                          stats = f' scored=[{stats}]'
+                      if 'newsletters' in output:
+                          stats = ' | '.join(f'{c}:{len(h)}chars' for c,h in output['newsletters'].items())
+                          stats = f' html=[{stats}]'
+
+                      print(f'[{node_name}] Phase: {phase}{stats}', flush=True)
+
+              # Save newsletters
               newsletters = final.get('newsletters', {})
               os.makedirs('output/newsletters', exist_ok=True)
               for country, html in newsletters.items():
                   with open(f'output/newsletters/newsletter_{country}.html', 'w') as f:
                       f.write(html)
-                  print(f'Saved newsletter_{country}.html ({len(html)} chars)')
+                  print(f'Saved newsletter_{country}.html ({len(html)} chars)', flush=True)
 
-              print(f'Pipeline completed! {len(newsletters)} newsletters generated.')
+              print(f'=== Pipeline completed! {len(newsletters)} newsletters ===', flush=True)
 
           asyncio.run(main())
           "
         env:
-          INPUT_COUNTRIES: ${{ github.event.inputs.countries || 'KR,RU,VN,TH,PH,PK' }}
+          INPUT_COUNTRIES: ${{ github.event.inputs.countries || 'KR' }}
           INPUT_DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
 
       - name: Update Supabase runs to "completed"
