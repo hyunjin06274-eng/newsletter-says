@@ -130,23 +130,28 @@ export default function Dashboard() {
         </div>
 
         <div className="flex gap-3">
-        {/* Start New Run (dry run - no email) */}
+        {/* Start / Active toggle */}
         <button
-          onClick={handleStartRun}
-          disabled={isRunning}
-          className={`px-5 py-3 text-white rounded-lg font-medium transition-all flex items-center gap-2 text-sm ${
+          onClick={() => {
+            if (isRunning) {
+              setRunState("idle");
+            } else {
+              handleStartRun();
+            }
+          }}
+          className={`px-5 py-3 rounded-lg font-medium transition-all flex items-center gap-2 text-sm ${
             isRunning
-              ? "bg-blue-600 cursor-not-allowed"
-              : "bg-red-600 hover:bg-red-700 hover:scale-105"
+              ? "bg-blue-600 text-white ring-2 ring-blue-400/50"
+              : "bg-red-600 hover:bg-red-700 hover:scale-105 text-white"
           }`}
         >
           {isRunning ? (
             <>
-              <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              {runState === "starting" ? "Starting..." : "Running..."}
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white" />
+              </span>
+              Active
             </>
           ) : (
             <>
