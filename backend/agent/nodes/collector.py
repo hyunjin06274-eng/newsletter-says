@@ -130,13 +130,16 @@ def generate_dynamic_queries(country: str, domain: str) -> list[str]:
 
 
 def fetch_google_news_rss(query: str, country: str, max_results: int = 15, days: int = 30) -> list[Article]:
-    """Fetch articles from Google News RSS — both English and local language."""
+    """Fetch articles from Google News RSS — LOCAL language FIRST, then English."""
     import feedparser
 
-    urls = [GOOGLE_NEWS_RSS_EN.format(query=query.replace(" ", "+"), country=country, days=days)]
+    # Local language first (higher priority for country-specific results)
+    urls = []
     local_template = GOOGLE_NEWS_RSS_LOCAL.get(country)
     if local_template:
         urls.append(local_template.format(query=query.replace(" ", "+"), days=days))
+    # English as fallback (fewer results to avoid flooding with global news)
+    urls.append(GOOGLE_NEWS_RSS_EN.format(query=query.replace(" ", "+"), country=country, days=days))
     articles = []
 
     for url in urls:
@@ -163,24 +166,23 @@ async def collect_for_country_domain(
     """Collect news for one country-domain pair using static + dynamic queries."""
     articles = []
 
-    # 1. Static template queries (always run as baseline)
+    # Keywords already include competitor + industry terms from Haiku
+    # Just search each keyword directly (local language RSS first)
     templates = DOMAIN_QUERY_TEMPLATES.get(domain, ["{keyword}"])
-    for kw in keywords[:4]:
-        for template in templates:
-            query = template.format(keyword=kw)
-            results = fetch_google_news_rss(query, country, max_results=8, days=days)
+    for kw in keywords[:5]:
+        # Direct keyword search (best for local results)
+        results = fetch_google_news_rss(kw, country, max_results=6, days=days)
+        for article in results:
+            article["collection_domain"] = domain
+        articles.extend(results)
+
+        # Template-expanded search (1 template only, to limit global noise)
+        if templates:
+            query = templates[0].format(keyword=kw)
+            results = fetch_google_news_rss(query, country, max_results=4, days=days)
             for article in results:
                 article["collection_domain"] = domain
             articles.extend(results)
-
-    # 2. LLM-generated dynamic queries (broader, more creative exploration)
-    dynamic_queries = generate_dynamic_queries(country, domain)
-    for query in dynamic_queries:
-        results = fetch_google_news_rss(query, country, max_results=10, days=days)
-        for article in results:
-            article["collection_domain"] = domain
-            article["query_source"] = "dynamic_llm"
-        articles.extend(results)
 
     logger.info(
         f"[{country}/{domain}] Collected {len(articles)} articles "
