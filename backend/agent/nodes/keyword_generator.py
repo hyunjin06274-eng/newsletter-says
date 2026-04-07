@@ -53,12 +53,30 @@ async def generate_keywords(state: NewsletterState) -> dict:
                     country_lang=ctx["lang"],
                     competitors=", ".join(ctx["competitors"]),
                 )
-                response = client.models.generate_content(
-                    model="gemini-2.5-flash-preview-05-20",
-                    contents=prompt,
-                )
-                text = response.text.strip()
-                if "[" in text and "]" in text:
+
+                # Try multiple models until one works
+                models = [
+                    "gemini-2.5-flash-preview-05-20",
+                    "gemini-2.0-flash",
+                    "gemini-2.0-flash-lite",
+                    "gemini-1.5-flash",
+                    "gemini-1.5-flash-latest",
+                    "gemini-pro",
+                ]
+                text = ""
+                for model_name in models:
+                    try:
+                        response = client.models.generate_content(
+                            model=model_name, contents=prompt,
+                        )
+                        text = response.text.strip()
+                        print(f"[{country}] Gemini model {model_name} OK", flush=True)
+                        break
+                    except Exception as model_err:
+                        print(f"[{country}] Gemini {model_name} failed, trying next...", flush=True)
+                        continue
+
+                if text and "[" in text and "]" in text:
                     try:
                         json_str = text[text.index("["):text.rindex("]") + 1]
                         country_keywords = json.loads(json_str)
