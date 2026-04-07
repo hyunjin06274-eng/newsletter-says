@@ -36,7 +36,6 @@ Output JSON array of strings only. Include mix of English and {country_lang} key
 async def generate_keywords(state: NewsletterState) -> dict:
     """Generate search keywords for each country using Gemini LLM."""
     countries = state["countries"]
-    date_str = state["date_str"]
     keywords = {}
 
     google_api_key = os.environ.get("GOOGLE_API_KEY", "")
@@ -46,22 +45,25 @@ async def generate_keywords(state: NewsletterState) -> dict:
 
         if google_api_key:
             try:
-                import google.generativeai as genai
-                genai.configure(api_key=google_api_key)
-                model = genai.GenerativeModel("gemini-2.0-flash-lite")
+                from google import genai
+                client = genai.Client(api_key=google_api_key)
 
                 prompt = KEYWORD_PROMPT.format(
                     country_name=ctx["name"],
                     country_lang=ctx["lang"],
                     competitors=", ".join(ctx["competitors"]),
                 )
-                import asyncio
-                response = await asyncio.to_thread(model.generate_content, prompt)
+                response = client.models.generate_content(
+                    model="gemini-2.5-flash-preview-05-20",
+                    contents=prompt,
+                )
                 text = response.text.strip()
-                # Extract JSON array from response
-                if "[" in text:
-                    json_str = text[text.index("["):text.rindex("]") + 1]
-                    country_keywords = json.loads(json_str)
+                if "[" in text and "]" in text:
+                    try:
+                        json_str = text[text.index("["):text.rindex("]") + 1]
+                        country_keywords = json.loads(json_str)
+                    except (json.JSONDecodeError, ValueError):
+                        country_keywords = []
                 else:
                     country_keywords = []
             except Exception as e:
@@ -70,9 +72,9 @@ async def generate_keywords(state: NewsletterState) -> dict:
         else:
             country_keywords = []
 
-        # Always include base keywords
         keywords[country] = BASE_KEYWORDS + country_keywords
         logger.info(f"[{country}] Generated {len(keywords[country])} keywords")
+        print(f"[{country}] {len(keywords[country])} keywords generated", flush=True)
 
     return {
         "keywords": keywords,
