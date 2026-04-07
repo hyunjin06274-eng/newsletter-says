@@ -148,25 +148,30 @@ async def score_articles(state: NewsletterState) -> dict:
     for country, articles in merged.items():
         # Quick filter first
         filtered = [a for a in articles if quick_filter(a)]
-        logger.info(f"[{country}] Quick filter: {len(articles)} -> {len(filtered)}")
+        # Limit to 30 articles max for LLM scoring (saves time + cost)
+        to_score = filtered[:30]
+        print(f"📊 [{country}] Quick filter: {len(articles)} -> {len(filtered)}, scoring top {len(to_score)}", flush=True)
 
         if client:
-            # LLM scoring
             scored_articles = []
-            for article in filtered:
+            for i, article in enumerate(to_score, 1):
+                title_short = article.get("title", "")[:40]
+                print(f"  📊 [{country}] Scoring {i}/{len(to_score)}: {title_short}...", flush=True)
                 scored_article = await score_single_article(article, client)
-                if scored_article.get("score", 0) >= 2:
+                s = scored_article.get("score", 0)
+                if s >= 2:
                     scored_articles.append(scored_article)
+                    print(f"  📊 [{country}] -> score={s} ✓", flush=True)
+                else:
+                    print(f"  📊 [{country}] -> score={s} ✗ (filtered)", flush=True)
         else:
-            # Fallback: keep all that passed quick filter with default score
-            for a in filtered:
+            for a in to_score:
                 a["score"] = 3
-            scored_articles = filtered
+            scored_articles = to_score
 
-        # Sort by score descending
         scored_articles.sort(key=lambda a: a.get("score", 0), reverse=True)
-        scored[country] = scored_articles[:20]  # Top 20 per country
-        logger.info(f"[{country}] Scored: {len(scored[country])} articles kept")
+        scored[country] = scored_articles[:15]
+        print(f"📊 [{country}] ✅ Scoring done: {len(scored[country])} articles kept", flush=True)
 
     return {
         "scored_articles": scored,

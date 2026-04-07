@@ -126,6 +126,7 @@ async def send_newsletter(state: NewsletterState) -> dict:
                     else:
                         country_extra[cr["country"]] = cr.get("recipients", [])
                 logger.info(f"Loaded recipients: global={global_recipients}, extras={list(country_extra.keys())}")
+                print(f"Loaded recipients: global={global_recipients}, extras={list(country_extra.keys())}", flush=True)
     except Exception as e:
         logger.warning(f"Failed to load recipients from Supabase: {e}")
 
@@ -168,6 +169,7 @@ async def send_newsletter(state: NewsletterState) -> dict:
             )
             send_results[country] = True
             logger.info(f"[{country}] Email sent to {recipients}")
+            print(f"[{country}] Email sent to {recipients}", flush=True)
         except Exception as e:
             logger.error(f"[{country}] Send failed: {e}")
             send_results[country] = False

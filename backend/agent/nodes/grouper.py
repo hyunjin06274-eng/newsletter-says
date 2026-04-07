@@ -117,6 +117,7 @@ async def group_articles(state: NewsletterState) -> dict:
         grouped[country] = grouped_articles
         removed = before - len(grouped_articles)
         logger.info(f"[{country}] Grouped: {before} -> {len(grouped_articles)} (-{removed} dupes)")
+        print(f"[{country}] Grouped: {before} -> {len(grouped_articles)} (-{removed} dupes)", flush=True)
 
     return {
         "grouped_articles": grouped,

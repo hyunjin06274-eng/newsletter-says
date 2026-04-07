@@ -121,6 +121,7 @@ def generate_dynamic_queries(country: str, domain: str) -> list[str]:
             except json.JSONDecodeError:
                 queries = []
             logger.info(f"[{country}/{domain}] LLM generated {len(queries)} dynamic queries")
+            print(f"[{country}/{domain}] LLM generated {len(queries)} dynamic queries", flush=True)
             return queries
     except Exception as e:
         logger.warning(f"[{country}/{domain}] Dynamic query generation failed: {e}")
@@ -207,6 +208,7 @@ async def collect_news(state: NewsletterState) -> dict:
 
         raw_articles[country] = all_articles
         logger.info(f"[{country}] Total collected: {len(all_articles)} articles")
+        print(f"[{country}] Total collected: {len(all_articles)} articles", flush=True)
 
     return {
         "raw_articles": raw_articles,

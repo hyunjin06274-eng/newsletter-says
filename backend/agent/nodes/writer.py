@@ -491,6 +491,7 @@ Output JSON only: {{"insights": ["...", "..."], "recommendations": ["...", "..."
             country, articles, days, insights, recommendations
         )
         logger.info(f"[{country}] Newsletter generated ({len(newsletters[country])} chars)")
+        print(f"[{country}] Newsletter generated ({len(newsletters[country])} chars)", flush=True)
 
     return {
         "newsletters": newsletters,

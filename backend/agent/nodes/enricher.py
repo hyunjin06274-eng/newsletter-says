@@ -87,13 +87,16 @@ async def enrich_snippets(state: NewsletterState) -> dict:
     for country, articles in scored.items():
         enriched_articles = []
         country_name = COUNTRY_NAMES.get(country, country)
+        total = len(articles)
+        print(f"📝 [{country}] Enriching {total} articles...", flush=True)
 
-        for article in articles:
+        for idx, article in enumerate(articles, 1):
             # 1. URL validation
             url = article.get("url", "")
             if not is_valid_url(url):
                 article["url_valid"] = False
                 logger.info(f"[{country}] Invalid URL removed: {url[:60]}")
+                print(f"[{country}] Invalid URL removed: {url[:60]}", flush=True)
             else:
                 article["url_valid"] = True
 
@@ -137,6 +140,7 @@ async def enrich_snippets(state: NewsletterState) -> dict:
         enriched[country] = enriched_articles
         valid_count = sum(1 for a in enriched_articles if a.get("url_valid", True))
         logger.info(f"[{country}] Enriched {len(enriched_articles)} articles ({valid_count} valid URLs)")
+        print(f"[{country}] Enriched {len(enriched_articles)} articles ({valid_count} valid URLs)", flush=True)
 
     return {
         "enriched_articles": enriched,

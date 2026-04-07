@@ -45,6 +45,7 @@ async def merge_and_dedupe(state: NewsletterState) -> dict:
         deduped = dedupe_articles(articles)
         merged[country] = deduped
         logger.info(f"[{country}] Merged: {before} -> {len(deduped)} (removed {before - len(deduped)} dupes)")
+        print(f"[{country}] Merged: {before} -> {len(deduped)} (removed {before - len(deduped)} dupes)", flush=True)
 
     return {
         "merged_articles": merged,
