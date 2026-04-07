@@ -184,10 +184,7 @@ async def collect_for_country_domain(
                 article["collection_domain"] = domain
             articles.extend(results)
 
-    logger.info(
-        f"[{country}/{domain}] Collected {len(articles)} articles "
-        f"(static + {len(dynamic_queries)} dynamic queries)"
-    )
+    print(f"  📡 [{country}/{domain}] Collected {len(articles)} articles", flush=True)
     return articles
 
 
