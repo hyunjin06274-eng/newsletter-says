@@ -105,7 +105,7 @@ jobs:
           asyncio.run(main())
           "
         env:
-          INPUT_COUNTRIES: ${{ github.event.inputs.countries || 'KR' }}
+          INPUT_COUNTRIES: ${{ github.event.inputs.countries || 'KR,RU,VN,TH,PH,PK' }}
           INPUT_DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
 
       - name: Update Supabase runs to "completed"
