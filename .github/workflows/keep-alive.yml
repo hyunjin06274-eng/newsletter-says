@@ -1,0 +1,13 @@
+name: Keep Render Alive
+
+on:
+  schedule:
+    # Every 14 minutes
+    - cron: "*/14 * * * *"
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Render backend
+        run: curl -s -m 30 https://newsletter-says.onrender.com/health || true
