@@ -43,7 +43,7 @@ jobs:
           cache: "pip"
 
       - name: Install dependencies
-        run: pip install -r backend/requirements.txt langgraph langchain-core langchain-anthropic anthropic feedparser beautifulsoup4 lxml trafilatura deep-translator google-api-python-client google-auth google-auth-httplib2 google-auth-oauthlib pyyaml tenacity python-dateutil
+        run: pip install -r backend/requirements.txt langgraph langchain-core langchain-anthropic anthropic feedparser beautifulsoup4 lxml trafilatura deep-translator google-api-python-client google-auth google-auth-httplib2 google-auth-oauthlib google-generativeai pyyaml tenacity python-dateutil
 
       - name: Update Supabase runs to "in_progress"
         run: |

@@ -115,8 +115,11 @@ def generate_dynamic_queries(country: str, domain: str) -> list[str]:
             messages=[{"role": "user", "content": prompt}],
         )
         text = response.content[0].text.strip()
-        if "[" in text:
-            queries = json.loads(text[text.index("["):text.rindex("]") + 1])
+        if "[" in text and "]" in text:
+            try:
+                queries = json.loads(text[text.index("["):text.rindex("]") + 1])
+            except json.JSONDecodeError:
+                queries = []
             logger.info(f"[{country}/{domain}] LLM generated {len(queries)} dynamic queries")
             return queries
     except Exception as e:
