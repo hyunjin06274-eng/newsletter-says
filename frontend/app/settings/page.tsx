@@ -91,21 +91,37 @@ export default function SettingsPage() {
   }, []);
 
   async function fetchSettings() {
-    // 1. Try API first
+    // 1. Always load localStorage first (instant, reliable)
+    const local = loadFromLocal();
+    if (local) {
+      applySettings(local);
+    }
+
+    // 2. Then try API — only overwrite if API has recipients data
     try {
       const res = await fetch("/api/settings");
       if (res.ok) {
         const data: Settings = await res.json();
-        applySettings(data);
-        saveToLocal(data.schedule); // sync to localStorage
-        return;
-      }
-    } catch {}
+        const apiHasRecipients = (data.schedule.country_recipients || []).length > 0;
 
-    // 2. Fallback: load from localStorage
-    const local = loadFromLocal();
-    if (local) {
-      applySettings(local);
+        if (apiHasRecipients) {
+          // API has real data — use it and sync to localStorage
+          applySettings(data);
+          saveToLocal(data.schedule);
+        } else if (local) {
+          // API has no recipients but localStorage does — push local to API
+          const localRecipients = local.schedule?.country_recipients || [];
+          if (localRecipients.length > 0) {
+            fetch("/api/settings", {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(local.schedule),
+            }).catch(() => {});
+          }
+        }
+      }
+    } catch {
+      // API not available — localStorage data already loaded
     }
   }
 
@@ -119,7 +135,6 @@ export default function SettingsPage() {
           recipients: emailStr.split(",").map((e) => e.trim()).filter(Boolean),
         }));
 
-      // Add global recipients as "ALL"
       if (globalRecipients.trim()) {
         countryRecipients.unshift({
           country: "ALL",
@@ -136,18 +151,34 @@ export default function SettingsPage() {
         country_recipients: countryRecipients,
       };
 
-      // Always save to localStorage first (instant)
+      // 1. Save to localStorage (instant, never fails)
       saveToLocal(settingsPayload);
+
+      // 2. Save to API (Supabase) — await with timeout
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15000);
+        const res = await fetch("/api/settings", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(settingsPayload),
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+        if (res.ok) {
+          setSaved(true);
+          setSaving(false);
+          setTimeout(() => setSaved(false), 2000);
+          return;
+        }
+      } catch {
+        // API failed — but localStorage saved
+      }
+
+      // Show saved (localStorage at minimum)
       setSaved(true);
       setSaving(false);
       setTimeout(() => setSaved(false), 2000);
-
-      // Also try API in background (don't block UI)
-      fetch("/api/settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settingsPayload),
-      }).catch(() => {});
     } catch (e) {
       console.error("Save failed:", e);
       setSaving(false);
