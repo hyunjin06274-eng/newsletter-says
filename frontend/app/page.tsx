@@ -141,7 +141,7 @@ export default function Dashboard() {
           <h1 className="text-3xl font-bold">Dashboard</h1>
           <p className="text-gray-400 mt-1">SK Enmove Global MI Newsletter Pipeline</p>
           <div className="flex items-center gap-3 mt-2">
-            <span className="text-gray-600 text-xs">Schedule: Every Tuesday 09:00 KST</span>
+            <span className="text-gray-600 text-xs">Schedule: Every Wednesday 07:00 KST</span>
             <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${
               apiConnected ? "bg-green-900/40 text-green-400"
                 : waking ? "bg-yellow-900/40 text-yellow-400"

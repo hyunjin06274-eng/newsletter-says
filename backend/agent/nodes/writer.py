@@ -130,6 +130,10 @@ def _build_article_card(article: dict, idx: int) -> str:
         title_html = f'<span style="color:{NAVY};font-size:15px;font-weight:700;line-height:1.5">{title}</span>'
         source_link = ""
 
+    # Global tag
+    scope = article.get("scope", "local")
+    global_tag = '<span style="display:inline-block;background:#6366F1;color:#fff;font-size:9px;padding:1px 6px;border-radius:3px;font-weight:700;margin-left:6px;vertical-align:middle">GLOBAL</span>' if scope == "global" else ""
+
     # Score 5 gets highlighted card with gold left border
     if score >= 5:
         card_bg = "#FFFBEB"
@@ -151,7 +155,7 @@ def _build_article_card(article: dict, idx: int) -> str:
     <table width="100%" cellpadding="0" cellspacing="0" border="0">
     <tr><td>
       <span style="display:inline-block;background-color:{badge_bg};color:{badge_color};font-size:10px;padding:3px 10px;border-radius:12px;font-weight:700;letter-spacing:0.5px">{badge_text}</span>
-      {hot_tag}
+      {hot_tag}{global_tag}
     </td></tr>
     <tr><td style="padding-top:8px">
       {title_html}
