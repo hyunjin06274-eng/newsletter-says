@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, use } from "react";
+import { apiFetch } from "../../api-client";
 
 const COUNTRY_NAMES: Record<string, string> = {
   KR: "Korea", RU: "Russia", VN: "Vietnam",
@@ -22,7 +23,7 @@ export default function NewsletterPreviewPage({
 
   async function fetchNewsletter() {
     try {
-      const res = await fetch(`/api/newsletters/${id}?country=${country}`);
+      const res = await apiFetch(`/api/newsletters/${id}?country=${country}`);
       if (res.ok) {
         const data = await res.json();
         setHtml(data.html || "");

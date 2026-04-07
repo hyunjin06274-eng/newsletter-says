@@ -113,7 +113,7 @@ export default function SettingsPage() {
           // API has no recipients but localStorage does — push local to API
           const localRecipients = local.schedule?.country_recipients || [];
           if (localRecipients.length > 0) {
-            fetch("/api/settings", {
+            apiFetch("/api/settings", {
               method: "PUT",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(local.schedule),

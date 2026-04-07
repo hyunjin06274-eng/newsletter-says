@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { apiFetch } from "../api-client";
 
 const COUNTRY_FLAGS: Record<string, string> = {
   KR: "\uD83C\uDDF0\uD83C\uDDF7", RU: "\uD83C\uDDF7\uD83C\uDDFA", VN: "\uD83C\uDDFB\uD83C\uDDF3",
@@ -34,7 +35,7 @@ export default function RunsPage() {
 
   async function fetchRuns() {
     try {
-      const res = await fetch(`/api/runs?page=${page}&page_size=20`);
+      const res = await apiFetch(`/api/runs?page=${page}&page_size=20`);
       if (res.ok) {
         const data = await res.json();
         setRuns(data.runs || []);

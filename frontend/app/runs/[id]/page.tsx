@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, use } from "react";
+import { apiFetch } from "../../api-client";
 
 const COUNTRY_FLAGS: Record<string, string> = {
   KR: "\uD83C\uDDF0\uD83C\uDDF7", RU: "\uD83C\uDDF7\uD83C\uDDFA", VN: "\uD83C\uDDFB\uD83C\uDDF3",
@@ -71,7 +72,7 @@ export default function RunDetailPage({ params }: { params: Promise<{ id: string
 
   async function fetchRun() {
     try {
-      const res = await fetch(`/api/runs/${id}`);
+      const res = await apiFetch(`/api/runs/${id}`);
       if (res.ok) {
         const data = await res.json();
         setRun(data);
@@ -87,7 +88,7 @@ export default function RunDetailPage({ params }: { params: Promise<{ id: string
   async function loadPreview(country: string) {
     setPreviewCountry(country);
     try {
-      const res = await fetch(`/api/newsletters/${id}?country=${country}`);
+      const res = await apiFetch(`/api/newsletters/${id}?country=${country}`);
       if (res.ok) {
         const data = await res.json();
         setPreviewHtml(data.html || "");
