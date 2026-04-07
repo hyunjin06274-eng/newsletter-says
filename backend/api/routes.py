@@ -144,11 +144,11 @@ async def stream_events(run_id: str):
 async def list_runs(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100)):
     db = get_supabase()
     offset = (page - 1) * page_size
+    # Only fetch lightweight columns (exclude newsletter_html which is huge)
     rows = db.select("runs", {
         "select": "id,date_str,status,countries,total_sent,created_at",
         "order": "created_at.desc",
-        "offset": str(offset), "limit": str(page_size),
-    })
+    }, limit=page_size, offset=offset)
     return RunListResponse(
         runs=[RunListItem(
             id=r["id"], date_str=r.get("date_str", ""),
