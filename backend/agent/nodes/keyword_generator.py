@@ -48,7 +48,7 @@ async def generate_keywords(state: NewsletterState) -> dict:
             try:
                 import google.generativeai as genai
                 genai.configure(api_key=google_api_key)
-                model = genai.GenerativeModel("gemini-2.0-flash")
+                model = genai.GenerativeModel("gemini-2.0-flash-lite")
 
                 prompt = KEYWORD_PROMPT.format(
                     country_name=ctx["name"],
