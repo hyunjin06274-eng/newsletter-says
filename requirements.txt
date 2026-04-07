@@ -32,8 +32,7 @@ pyyaml>=6.0.1
 pydantic>=2.5.0
 pydantic-settings>=2.1.0
 
-# Database
-supabase>=2.0.0
+# Database (Supabase via REST API - no extra dependency needed, uses requests)
 
 # Utils
 python-dotenv>=1.0.0
