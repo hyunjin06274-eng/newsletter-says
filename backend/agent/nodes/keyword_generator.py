@@ -1,4 +1,4 @@
-"""Phase 0.5: LLM-based dynamic keyword generation using Gemini."""
+"""Phase 0.5: Dynamic keyword generation using Claude Haiku."""
 
 import json
 import logging
@@ -10,89 +10,109 @@ from backend.agent.state import NewsletterState
 logger = logging.getLogger(__name__)
 
 COUNTRY_CONTEXT = {
-    "KR": {"name": "한국", "lang": "Korean", "competitors": ["SK ZIC", "GS Kixx", "S-OIL", "현대오일뱅크"]},
-    "RU": {"name": "러시아", "lang": "Russian", "competitors": ["Lukoil", "Gazpromneft", "Rosneft", "Shell Russia"]},
-    "VN": {"name": "베트남", "lang": "Vietnamese", "competitors": ["Petrolimex PLC", "Castrol Vietnam", "Shell Vietnam"]},
-    "TH": {"name": "태국", "lang": "Thai", "competitors": ["PTT Lubricants", "Shell Thailand", "Castrol Thailand"]},
-    "PH": {"name": "필리핀", "lang": "Filipino/English", "competitors": ["Petron", "Shell Philippines", "Caltex PH"]},
-    "PK": {"name": "파키스탄", "lang": "Urdu/English", "competitors": ["PSO", "Shell Pakistan", "Attock Petroleum"]},
+    "KR": {
+        "name": "한국", "lang": "Korean",
+        "competitors": ["GS칼텍스 Kixx", "S-OIL", "현대오일뱅크", "Shell Korea", "Castrol Korea", "Valvoline Korea", "Motul Korea"],
+        "forward_industries": ["현대차 기아 자동차 판매", "하이브리드 전기차 전환", "건설기계 수출 두산밥캣", "조선해양 선박엔진", "농기계 트랙터"],
+    },
+    "RU": {
+        "name": "러시아", "lang": "Russian",
+        "competitors": ["Lukoil", "Gazpromneft G-Energy", "Rosneft", "Shell Russia", "Castrol Russia", "Tatneft"],
+        "forward_industries": ["Russia car sales Lada", "Russia truck fleet KAMAZ", "Russia oil refinery base oil", "Russia sanctions oil export"],
+    },
+    "VN": {
+        "name": "베트남", "lang": "Vietnamese",
+        "competitors": ["Petrolimex PLC", "Castrol Vietnam", "Shell Vietnam", "Total Vietnam", "Idemitsu Vietnam"],
+        "forward_industries": ["Vietnam motorcycle sales Honda Yamaha", "Vietnam car market VinFast", "Vietnam construction boom", "Vietnam EV policy"],
+    },
+    "TH": {
+        "name": "태국", "lang": "Thai",
+        "competitors": ["PTT Lubricants", "Shell Thailand", "Castrol Thailand", "Caltex Thailand", "Valvoline Thailand"],
+        "forward_industries": ["Thailand car production export", "Thailand EV policy BYD", "Thailand motorcycle market", "Thailand petrochemical"],
+    },
+    "PH": {
+        "name": "필리핀", "lang": "Filipino/English",
+        "competitors": ["Petron", "Shell Philippines", "Caltex Philippines", "Total Philippines", "Castrol Philippines"],
+        "forward_industries": ["Philippines car motorcycle sales", "Philippines jeepney modernization", "Philippines oil import", "Philippines maritime shipping"],
+    },
+    "PK": {
+        "name": "파키스탄", "lang": "Urdu/English",
+        "competitors": ["PSO", "Shell Pakistan", "Attock Petroleum", "Caltex Pakistan", "Total Parco"],
+        "forward_industries": ["Pakistan vehicle market Suzuki Toyota", "Pakistan truck fleet", "Pakistan oil energy import", "Pakistan agricultural machinery"],
+    },
 }
 
 BASE_KEYWORDS = [
-    "Shell lubricants", "Castrol engine oil", "Valvoline lubricant",
-    "Mobil 1 lubricant", "TotalEnergies lubricants", "Fuchs lubricant",
-    "lubricant market", "engine oil distribution", "OEM lubricant approval",
+    "lubricant market", "engine oil", "OEM lubricant approval",
 ]
 
-KEYWORD_PROMPT = """You are a market intelligence keyword generator for the lubricant industry.
-Generate 10 search keywords for {country_name} ({country_lang}) market.
-Focus on: lubricant sales strategy, competitor activity, regulatory changes, vehicle market trends.
-Local competitors: {competitors}
+KEYWORD_PROMPT = """Generate 12 search keywords for {country_name} lubricant market intelligence.
 
-Output JSON array of strings only. Include mix of English and {country_lang} keywords.
-"""
+Priority order (generate in this order):
+1. Local competitors + lubricant (4 keywords): {competitors}
+2. Forward industry + demand (4 keywords): {forward_industries}
+3. Lubricant regulation/specification (2 keywords)
+4. Market trends in {country_lang} language (2 keywords)
+
+Rules:
+- Each keyword should be a Google News search query (2-5 words)
+- Mix English and {country_lang} keywords
+- Focus on what affects lubricant SALES in {country_name}
+
+Output JSON array of 12 strings only. No explanation."""
 
 
 async def generate_keywords(state: NewsletterState) -> dict:
-    """Generate search keywords for each country using Gemini LLM."""
+    """Generate search keywords using Claude Haiku (fast + cheap)."""
     countries = state["countries"]
     keywords = {}
-
-    google_api_key = os.environ.get("GOOGLE_API_KEY", "")
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
 
     for country in countries:
-        ctx = COUNTRY_CONTEXT.get(country, {"name": country, "lang": "English", "competitors": []})
+        ctx = COUNTRY_CONTEXT.get(country, {
+            "name": country, "lang": "English",
+            "competitors": [], "forward_industries": [],
+        })
 
-        if google_api_key:
+        country_keywords = []
+
+        if api_key:
             try:
-                from google import genai
-                client = genai.Client(api_key=google_api_key)
+                import anthropic
+                client = anthropic.Anthropic(api_key=api_key)
 
                 prompt = KEYWORD_PROMPT.format(
                     country_name=ctx["name"],
                     country_lang=ctx["lang"],
                     competitors=", ".join(ctx["competitors"]),
+                    forward_industries=", ".join(ctx["forward_industries"]),
                 )
 
-                # Try multiple models until one works
-                models = [
-                    "gemini-2.5-flash-preview-05-20",
-                    "gemini-2.0-flash",
-                    "gemini-2.0-flash-lite",
-                    "gemini-1.5-flash",
-                    "gemini-1.5-flash-latest",
-                    "gemini-pro",
-                ]
-                text = ""
-                for model_name in models:
-                    try:
-                        response = client.models.generate_content(
-                            model=model_name, contents=prompt,
-                        )
-                        text = response.text.strip()
-                        print(f"[{country}] Gemini model {model_name} OK", flush=True)
-                        break
-                    except Exception as model_err:
-                        print(f"[{country}] Gemini {model_name} failed, trying next...", flush=True)
-                        continue
+                response = client.messages.create(
+                    model="claude-haiku-4-5-20251001",
+                    max_tokens=400,
+                    messages=[{"role": "user", "content": prompt}],
+                )
+                text = response.text.strip() if hasattr(response, 'text') else response.content[0].text.strip()
 
-                if text and "[" in text and "]" in text:
+                if "[" in text and "]" in text:
                     try:
-                        json_str = text[text.index("["):text.rindex("]") + 1]
-                        country_keywords = json.loads(json_str)
-                    except (json.JSONDecodeError, ValueError):
+                        country_keywords = json.loads(text[text.index("["):text.rindex("]") + 1])
+                        print(f"[{country}] Haiku generated {len(country_keywords)} keywords", flush=True)
+                    except json.JSONDecodeError:
                         country_keywords = []
-                else:
-                    country_keywords = []
             except Exception as e:
-                logger.warning(f"Gemini keyword generation failed for {country}: {e}")
+                print(f"[{country}] Keyword generation failed: {e}", flush=True)
                 country_keywords = []
-        else:
-            country_keywords = []
+
+        # Fallback: use hardcoded competitor + industry keywords
+        if not country_keywords:
+            country_keywords = [c + " lubricant" for c in ctx.get("competitors", [])[:4]]
+            country_keywords += ctx.get("forward_industries", [])[:4]
+            print(f"[{country}] Using fallback keywords ({len(country_keywords)})", flush=True)
 
         keywords[country] = BASE_KEYWORDS + country_keywords
-        logger.info(f"[{country}] Generated {len(keywords[country])} keywords")
-        print(f"[{country}] {len(keywords[country])} keywords generated", flush=True)
+        print(f"[{country}] Total {len(keywords[country])} keywords ready", flush=True)
 
     return {
         "keywords": keywords,
