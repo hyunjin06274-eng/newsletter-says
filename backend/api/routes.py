@@ -8,6 +8,7 @@ import logging
 import uuid
 from datetime import datetime
 
+import requests
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from sse_starlette.sse import EventSourceResponse
 
@@ -23,62 +24,40 @@ _event_queues: dict[str, asyncio.Queue] = {}
 _active_runs: dict[str, dict] = {}
 
 
-async def run_pipeline(run_id: str, countries: list[str], date_str: str, days: int, dry_run: bool):
-    """Execute the LangGraph pipeline in background."""
-    import traceback
-    from backend.agent.graph import compile_graph, create_initial_state
+async def trigger_github_action(run_id: str, countries: list[str], date_str: str):
+    """Trigger GitHub Actions to run the pipeline (avoids Render memory limit)."""
+    import os
+    github_token = os.environ.get("GH_DISPATCH_TOKEN", "")
+    repo = "hyunjin06274-eng/newsletter-says"
 
-    graph = compile_graph()
-    initial_state = create_initial_state(countries=countries, date_str=date_str, days=days)
-    initial_state["run_id"] = run_id
-    initial_state["max_audit_iterations"] = 3
-
-    queue = _event_queues.get(run_id)
-    final_state = {}
-    db = get_supabase()
+    if not github_token:
+        logging.getLogger(__name__).warning("GH_DISPATCH_TOKEN not set, cannot trigger workflow")
+        return False
 
     try:
-        config = {"configurable": {"thread_id": run_id}}
-        _active_runs[run_id] = {"status": "running", "phase": "keywords"}
-
-        async for event in graph.astream(initial_state, config=config):
-            for node_name, node_output in event.items():
-                phase = node_output.get("current_phase", "")
-                final_state.update(node_output)
-                _active_runs[run_id] = {"status": "running", "phase": phase}
-
-                db.insert("run_logs", {
-                    "run_id": run_id, "phase": phase, "level": "info",
-                    "message": f"Node {node_name} completed",
-                })
-
-                if queue:
-                    for e in node_output.get("events", []):
-                        await queue.put(e)
-
-        _active_runs[run_id] = {"status": "completed", "phase": "complete"}
-        raw = final_state.get("raw_articles", {})
-        scored = final_state.get("scored_articles", {})
-        db.update("runs", {
-            "status": "completed", "current_phase": "complete",
-            "completed_at": datetime.utcnow().isoformat(),
-            "newsletter_html": final_state.get("newsletters", {}),
-            "audit_iterations": final_state.get("audit_iteration", 0),
-            "total_collected": sum(len(v) for v in raw.values()),
-            "total_filtered": sum(len(v) for v in scored.values()),
-            "total_sent": sum(1 for v in final_state.get("send_results", {}).values() if v),
-        }, {"id": run_id})
-
-        if queue:
-            await queue.put({"type": "complete", "ts": datetime.now().isoformat()})
-
+        resp = requests.post(
+            f"https://api.github.com/repos/{repo}/actions/workflows/schedule.yml/dispatches",
+            headers={
+                "Authorization": f"Bearer {github_token}",
+                "Accept": "application/vnd.github.v3+json",
+            },
+            json={
+                "ref": "main",
+                "inputs": {
+                    "countries": ",".join(countries),
+                    "dry_run": "false",
+                },
+            },
+            timeout=10,
+        )
+        if resp.status_code in (204, 200):
+            logging.getLogger(__name__).info(f"GitHub Actions triggered for run {run_id}")
+            return True
+        else:
+            logging.getLogger(__name__).error(f"GitHub dispatch failed: {resp.status_code} {resp.text}")
     except Exception as e:
-        logging.getLogger(__name__).error(f"Pipeline failed: {traceback.format_exc()}")
-        _active_runs[run_id] = {"status": "failed", "phase": "error"}
-        db.update("runs", {"status": "failed", "errors": [str(e)]}, {"id": run_id})
-        db.insert("run_logs", {"run_id": run_id, "phase": "error", "level": "error", "message": str(e)})
-        if queue:
-            await queue.put({"type": "error", "ts": datetime.now().isoformat(), "error": str(e)})
+        logging.getLogger(__name__).error(f"GitHub dispatch error: {e}")
+    return False
 
 
 @router.post("/runs", response_model=RunStatus)
@@ -88,8 +67,12 @@ async def create_run(body: RunCreate, background_tasks: BackgroundTasks):
     db = get_supabase()
 
     db.insert("runs", {"id": run_id, "countries": body.countries, "date_str": date_str, "status": "running", "current_phase": "keywords"})
-    _event_queues[run_id] = asyncio.Queue()
-    background_tasks.add_task(run_pipeline, run_id, body.countries, date_str, body.days, body.dry_run)
+
+    # Trigger GitHub Actions instead of running locally (Render has 512MB memory limit)
+    import asyncio
+    triggered = await asyncio.to_thread(trigger_github_action, run_id, body.countries, date_str)
+    if not triggered:
+        db.update("runs", {"status": "pending", "current_phase": "waiting_for_dispatch"}, {"id": run_id})
 
     return RunStatus(
         id=run_id, countries=body.countries, date_str=date_str,

@@ -24,6 +24,7 @@ env:
   GMAIL_CREDENTIALS_JSON: ${{ secrets.GMAIL_CREDENTIALS_JSON }}
   GMAIL_SENDER: ${{ secrets.GMAIL_SENDER || 'skenbizst@gmail.com' }}
   DEFAULT_RECIPIENTS: ${{ secrets.DEFAULT_RECIPIENTS }}
+  GH_DISPATCH_TOKEN: ${{ secrets.GH_DISPATCH_TOKEN }}
 
 jobs:
   run-newsletter:
@@ -41,7 +42,7 @@ jobs:
           cache: "pip"
 
       - name: Install dependencies
-        run: pip install -r backend/requirements.txt
+        run: pip install -r backend/requirements.txt langgraph langchain-core langchain-anthropic anthropic feedparser beautifulsoup4 lxml trafilatura deep-translator google-api-python-client google-auth google-auth-httplib2 google-auth-oauthlib pyyaml tenacity python-dateutil
 
       - name: Run newsletter pipeline
         run: |
