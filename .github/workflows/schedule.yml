@@ -24,7 +24,8 @@ env:
   GMAIL_CREDENTIALS_JSON: ${{ secrets.GMAIL_CREDENTIALS_JSON }}
   GMAIL_SENDER: ${{ secrets.GMAIL_SENDER || 'skenbizst@gmail.com' }}
   DEFAULT_RECIPIENTS: ${{ secrets.DEFAULT_RECIPIENTS }}
-  GH_DISPATCH_TOKEN: ${{ secrets.GH_DISPATCH_TOKEN }}
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
 
 jobs:
   run-newsletter:
@@ -44,38 +45,70 @@ jobs:
       - name: Install dependencies
         run: pip install -r backend/requirements.txt langgraph langchain-core langchain-anthropic anthropic feedparser beautifulsoup4 lxml trafilatura deep-translator google-api-python-client google-auth google-auth-httplib2 google-auth-oauthlib pyyaml tenacity python-dateutil
 
+      - name: Update Supabase runs to "in_progress"
+        run: |
+          curl -s -X PATCH "${{ secrets.SUPABASE_URL }}/rest/v1/runs?status=eq.running" \
+            -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"current_phase": "collection"}' || true
+
       - name: Run newsletter pipeline
         run: |
-          python -c "
-          import asyncio
-          import os
-
-          os.environ['PYTHONPATH'] = '.'
+          PYTHONPATH=. python -c "
+          import asyncio, os, json
 
           from backend.agent.graph import compile_graph, create_initial_state
 
           countries = os.environ.get('INPUT_COUNTRIES', 'KR,RU,VN,TH,PH,PK').split(',')
           countries = [c.strip() for c in countries]
-          dry_run = os.environ.get('INPUT_DRY_RUN', 'false').lower() == 'true'
 
           async def main():
               graph = compile_graph()
               state = create_initial_state(countries=countries)
               config = {'configurable': {'thread_id': 'github-action'}}
+              final = {}
 
               async for event in graph.astream(state, config=config):
                   for node_name, output in event.items():
                       phase = output.get('current_phase', '')
+                      final.update(output)
                       print(f'[{node_name}] Phase: {phase}')
 
-              print('Pipeline completed!')
+              # Save newsletters to file for artifact upload
+              newsletters = final.get('newsletters', {})
+              os.makedirs('output/newsletters', exist_ok=True)
+              for country, html in newsletters.items():
+                  with open(f'output/newsletters/newsletter_{country}.html', 'w') as f:
+                      f.write(html)
+                  print(f'Saved newsletter_{country}.html ({len(html)} chars)')
+
+              print(f'Pipeline completed! {len(newsletters)} newsletters generated.')
 
           asyncio.run(main())
           "
         env:
-          PYTHONPATH: "."
           INPUT_COUNTRIES: ${{ github.event.inputs.countries || 'KR,RU,VN,TH,PH,PK' }}
           INPUT_DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+
+      - name: Update Supabase runs to "completed"
+        if: success()
+        run: |
+          curl -s -X PATCH "${{ secrets.SUPABASE_URL }}/rest/v1/runs?status=eq.running" \
+            -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"status": "completed", "current_phase": "complete"}' || true
+          echo "Supabase runs updated to completed"
+
+      - name: Update Supabase runs to "failed" on error
+        if: failure()
+        run: |
+          curl -s -X PATCH "${{ secrets.SUPABASE_URL }}/rest/v1/runs?status=eq.running" \
+            -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"status": "failed", "current_phase": "error"}' || true
 
       - name: Upload newsletters
         if: always()
@@ -84,6 +117,4 @@ jobs:
           name: newsletter-output-${{ github.run_number }}
           path: |
             output/newsletters/
-            output/filtered/
-            output/logs/
           retention-days: 30
