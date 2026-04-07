@@ -1,4 +1,4 @@
-"""FastAPI route definitions."""
+"""FastAPI route definitions — Supabase backend."""
 
 from __future__ import annotations
 
@@ -9,9 +9,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
-from sqlalchemy import select, func
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from sse_starlette.sse import EventSourceResponse
 
 from backend.api.schemas import (
@@ -19,13 +17,12 @@ from backend.api.schemas import (
     ScheduleSettings, SettingsResponse, NewsletterPreview,
 )
 from backend.core.config import settings
-from backend.core.database import Run, ScheduleConfig, get_session, async_session
+from backend.core.database import get_supabase
 
 router = APIRouter(prefix="/api")
 
-# In-memory event queues for SSE (run_id -> list of events)
+# In-memory event queues for SSE
 _event_queues: dict[str, asyncio.Queue] = {}
-# In-memory run status cache
 _active_runs: dict[str, dict] = {}
 
 
@@ -41,6 +38,7 @@ async def run_pipeline(run_id: str, countries: list[str], date_str: str, days: i
 
     queue = _event_queues.get(run_id)
     final_state = {}
+    db = get_supabase()
 
     try:
         config = {"configurable": {"thread_id": run_id}}
@@ -49,40 +47,40 @@ async def run_pipeline(run_id: str, countries: list[str], date_str: str, days: i
         async for event in graph.astream(initial_state, config=config):
             for node_name, node_output in event.items():
                 phase = node_output.get("current_phase", "")
-                events = node_output.get("events", [])
                 final_state.update(node_output)
+                _active_runs[run_id] = {"status": "running", "phase": phase, "node": node_name}
 
-                _active_runs[run_id] = {
-                    "status": "running",
-                    "phase": phase,
-                    "node": node_name,
-                }
+                # Log to Supabase
+                try:
+                    db.table("run_logs").insert({
+                        "run_id": run_id, "phase": phase, "level": "info",
+                        "message": f"Node {node_name} completed",
+                    }).execute()
+                except Exception:
+                    pass
 
                 if queue:
-                    for e in events:
+                    for e in node_output.get("events", []):
                         await queue.put(e)
 
         _active_runs[run_id] = {"status": "completed", "phase": "complete"}
 
-        # Persist results to DB
+        # Save results to Supabase
         try:
-            async with async_session() as session:
-                result = await session.execute(select(Run).where(Run.id == run_id))
-                db_run = result.scalar_one_or_none()
-                if db_run:
-                    db_run.status = "completed"
-                    db_run.current_phase = "complete"
-                    db_run.completed_at = datetime.utcnow()
-                    db_run.newsletter_html = json.dumps(final_state.get("newsletters", {}))
-                    db_run.audit_iterations = final_state.get("audit_iteration", 0)
-                    raw = final_state.get("raw_articles", {})
-                    scored = final_state.get("scored_articles", {})
-                    db_run.total_collected = sum(len(v) for v in raw.values())
-                    db_run.total_filtered = sum(len(v) for v in scored.values())
-                    db_run.total_sent = sum(1 for v in final_state.get("send_results", {}).values() if v)
-                    await session.commit()
-        except Exception as db_err:
-            logging.getLogger(__name__).error(f"DB persist failed: {db_err}")
+            raw = final_state.get("raw_articles", {})
+            scored = final_state.get("scored_articles", {})
+            db.table("runs").update({
+                "status": "completed",
+                "current_phase": "complete",
+                "completed_at": datetime.utcnow().isoformat(),
+                "newsletter_html": final_state.get("newsletters", {}),
+                "audit_iterations": final_state.get("audit_iteration", 0),
+                "total_collected": sum(len(v) for v in raw.values()),
+                "total_filtered": sum(len(v) for v in scored.values()),
+                "total_sent": sum(1 for v in final_state.get("send_results", {}).values() if v),
+            }).eq("id", run_id).execute()
+        except Exception as e:
+            logging.getLogger(__name__).error(f"DB update failed: {e}")
 
         if queue:
             await queue.put({"type": "complete", "ts": datetime.now().isoformat()})
@@ -90,41 +88,34 @@ async def run_pipeline(run_id: str, countries: list[str], date_str: str, days: i
     except Exception as e:
         logging.getLogger(__name__).error(f"Pipeline failed: {traceback.format_exc()}")
         _active_runs[run_id] = {"status": "failed", "phase": "error", "error": str(e)}
-
         try:
-            async with async_session() as session:
-                result = await session.execute(select(Run).where(Run.id == run_id))
-                db_run = result.scalar_one_or_none()
-                if db_run:
-                    db_run.status = "failed"
-                    db_run.errors = json.dumps([str(e)])
-                    await session.commit()
+            db.table("runs").update({
+                "status": "failed", "errors": [str(e)],
+            }).eq("id", run_id).execute()
+            db.table("run_logs").insert({
+                "run_id": run_id, "phase": "error", "level": "error",
+                "message": str(e),
+            }).execute()
         except Exception:
             pass
-
         if queue:
             await queue.put({"type": "error", "ts": datetime.now().isoformat(), "error": str(e)})
 
 
 @router.post("/runs", response_model=RunStatus)
-async def create_run(
-    body: RunCreate,
-    background_tasks: BackgroundTasks,
-    session: AsyncSession = Depends(get_session),
-):
+async def create_run(body: RunCreate, background_tasks: BackgroundTasks):
     """Start a new newsletter pipeline run."""
     run_id = str(uuid.uuid4())
     date_str = body.date_str or datetime.now().strftime("%Y%m%d")
+    db = get_supabase()
 
-    db_run = Run(
-        id=run_id,
-        countries=json.dumps(body.countries),
-        date_str=date_str,
-        status="running",
-        current_phase="keywords",
-    )
-    session.add(db_run)
-    await session.commit()
+    db.table("runs").insert({
+        "id": run_id,
+        "countries": body.countries,
+        "date_str": date_str,
+        "status": "running",
+        "current_phase": "keywords",
+    }).execute()
 
     _event_queues[run_id] = asyncio.Queue()
 
@@ -133,47 +124,39 @@ async def create_run(
     )
 
     return RunStatus(
-        id=run_id,
-        countries=body.countries,
-        date_str=date_str,
-        status="running",
-        current_phase="keywords",
-        phase_status={},
-        errors=[],
-        audit_iterations=0,
-        total_collected=0,
-        total_filtered=0,
-        total_sent=0,
-        created_at=datetime.utcnow(),
-        completed_at=None,
+        id=run_id, countries=body.countries, date_str=date_str,
+        status="running", current_phase="keywords", phase_status={},
+        errors=[], audit_iterations=0,
+        total_collected=0, total_filtered=0, total_sent=0,
+        created_at=datetime.utcnow(), completed_at=None,
     )
 
 
 @router.get("/runs/{run_id}", response_model=RunStatus)
-async def get_run(run_id: str, session: AsyncSession = Depends(get_session)):
+async def get_run(run_id: str):
     """Get run status."""
-    result = await session.execute(select(Run).where(Run.id == run_id))
-    db_run = result.scalar_one_or_none()
-    if not db_run:
+    db = get_supabase()
+    result = db.table("runs").select("*").eq("id", run_id).execute()
+    if not result.data:
         raise HTTPException(404, "Run not found")
 
-    # Merge with active status
+    r = result.data[0]
     active = _active_runs.get(run_id, {})
 
     return RunStatus(
-        id=db_run.id,
-        countries=json.loads(db_run.countries),
-        date_str=db_run.date_str,
-        status=active.get("status", db_run.status),
-        current_phase=active.get("phase", db_run.current_phase),
-        phase_status=json.loads(db_run.phase_status),
-        errors=json.loads(db_run.errors),
-        audit_iterations=db_run.audit_iterations,
-        total_collected=db_run.total_collected,
-        total_filtered=db_run.total_filtered,
-        total_sent=db_run.total_sent,
-        created_at=db_run.created_at,
-        completed_at=db_run.completed_at,
+        id=r["id"],
+        countries=r.get("countries", []),
+        date_str=r.get("date_str", ""),
+        status=active.get("status", r.get("status", "pending")),
+        current_phase=active.get("phase", r.get("current_phase", "")),
+        phase_status=r.get("phase_status", {}),
+        errors=r.get("errors", []),
+        audit_iterations=r.get("audit_iterations", 0),
+        total_collected=r.get("total_collected", 0),
+        total_filtered=r.get("total_filtered", 0),
+        total_sent=r.get("total_sent", 0),
+        created_at=r.get("created_at", datetime.utcnow().isoformat()),
+        completed_at=r.get("completed_at"),
     )
 
 
@@ -182,7 +165,6 @@ async def stream_events(run_id: str):
     """SSE stream for real-time run updates."""
     if run_id not in _event_queues:
         _event_queues[run_id] = asyncio.Queue()
-
     queue = _event_queues[run_id]
 
     async def event_generator():
@@ -199,83 +181,70 @@ async def stream_events(run_id: str):
 
 
 @router.get("/runs")
-async def list_runs(
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
-    session: AsyncSession = Depends(get_session),
-):
+async def list_runs(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100)):
     """List all runs with pagination."""
-    total_result = await session.execute(select(func.count(Run.id)))
-    total = total_result.scalar() or 0
+    db = get_supabase()
+    offset = (page - 1) * page_size
 
-    result = await session.execute(
-        select(Run)
-        .order_by(Run.created_at.desc())
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-    )
-    runs = result.scalars().all()
+    result = db.table("runs").select("*", count="exact") \
+        .order("created_at", desc=True) \
+        .range(offset, offset + page_size - 1) \
+        .execute()
+
+    total = result.count or 0
 
     return RunListResponse(
         runs=[
             RunListItem(
-                id=r.id,
-                date_str=r.date_str,
-                status=r.status,
-                countries=json.loads(r.countries),
-                total_sent=r.total_sent,
-                created_at=r.created_at,
+                id=r["id"], date_str=r.get("date_str", ""),
+                status=_active_runs.get(r["id"], {}).get("status", r.get("status", "pending")),
+                countries=r.get("countries", []),
+                total_sent=r.get("total_sent", 0),
+                created_at=r.get("created_at", ""),
             )
-            for r in runs
+            for r in result.data
         ],
-        total=total,
-        page=page,
-        page_size=page_size,
+        total=total, page=page, page_size=page_size,
     )
 
 
 @router.get("/newsletters/{run_id}")
-async def get_newsletter(run_id: str, country: str = "KR", session: AsyncSession = Depends(get_session)):
+async def get_newsletter(run_id: str, country: str = "KR"):
     """Get generated newsletter HTML."""
-    result = await session.execute(select(Run).where(Run.id == run_id))
-    db_run = result.scalar_one_or_none()
-    if not db_run:
+    db = get_supabase()
+    result = db.table("runs").select("newsletter_html,date_str").eq("id", run_id).execute()
+    if not result.data:
         raise HTTPException(404, "Run not found")
 
-    newsletters = json.loads(db_run.newsletter_html or "{}")
+    newsletters = result.data[0].get("newsletter_html", {})
     html = newsletters.get(country, "")
     if not html:
         raise HTTPException(404, f"Newsletter not found for {country}")
 
     return NewsletterPreview(
-        country=country,
-        html=html,
-        date_str=db_run.date_str,
-        article_count=0,
+        country=country, html=html,
+        date_str=result.data[0].get("date_str", ""), article_count=0,
     )
 
 
 @router.get("/settings")
-async def get_settings(session: AsyncSession = Depends(get_session)):
+async def get_settings():
     """Get current settings."""
     import os
+    db = get_supabase()
 
-    result = await session.execute(select(ScheduleConfig).order_by(ScheduleConfig.id.desc()).limit(1))
-    config = result.scalar_one_or_none()
+    result = db.table("settings").select("*").order("id", desc=True).limit(1).execute()
 
     schedule = ScheduleSettings()
-    if config:
-        try:
-            recipients = json.loads(config.country_recipients or "[]")
-        except (json.JSONDecodeError, TypeError):
-            recipients = []
-
+    if result.data:
+        config = result.data[0]
+        recipients = config.get("country_recipients", [])
         schedule = ScheduleSettings(
-            frequency=config.frequency,
-            day_of_week=config.day_of_week,
-            time=config.time,
-            countries=json.loads(config.countries),
-            is_active=config.is_active,
+            frequency=config.get("frequency", "weekly"),
+            day_of_week=config.get("day_of_week", "Tuesday"),
+            time=config.get("time", "09:00"),
+            countries=config.get("countries", ["KR", "RU", "VN", "TH", "PH", "PK"]),
+            is_active=config.get("is_active", True),
             country_recipients=[
                 {"country": r["country"], "recipients": r["recipients"]}
                 for r in recipients if isinstance(r, dict)
@@ -289,30 +258,37 @@ async def get_settings(session: AsyncSession = Depends(get_session)):
             "google": bool(os.environ.get("GOOGLE_API_KEY")),
             "tavily": bool(os.environ.get("TAVILY_API_KEY")),
         },
-        gmail_authenticated=os.path.exists(settings.gmail_token_file),
+        gmail_authenticated=bool(os.environ.get("GMAIL_TOKEN_JSON")),
     )
 
 
 @router.put("/settings")
-async def update_settings(body: ScheduleSettings, session: AsyncSession = Depends(get_session)):
+async def update_settings(body: ScheduleSettings):
     """Update schedule and recipient settings."""
-    # Serialize recipients
-    recipients_json = json.dumps(
-        [{"country": cr.country, "recipients": cr.recipients}
-         for cr in body.country_recipients],
-        ensure_ascii=False,
-    ) if body.country_recipients else "[]"
+    db = get_supabase()
 
-    config = ScheduleConfig(
-        frequency=body.frequency,
-        day_of_week=body.day_of_week,
-        time=body.time,
-        countries=json.dumps(body.countries),
-        is_active=body.is_active,
-        country_recipients=recipients_json,
-        updated_at=datetime.utcnow(),
-    )
-    session.add(config)
-    await session.commit()
+    recipients_list = [
+        {"country": cr.country, "recipients": cr.recipients}
+        for cr in body.country_recipients
+    ] if body.country_recipients else []
 
-    return {"status": "ok", "message": "Settings saved successfully"}
+    db.table("settings").insert({
+        "frequency": body.frequency,
+        "day_of_week": body.day_of_week,
+        "time": body.time,
+        "countries": body.countries,
+        "is_active": body.is_active,
+        "country_recipients": recipients_list,
+        "updated_at": datetime.utcnow().isoformat(),
+    }).execute()
+
+    return {"status": "ok", "message": "Settings saved"}
+
+
+@router.get("/logs/{run_id}")
+async def get_run_logs(run_id: str):
+    """Get detailed logs for a run."""
+    db = get_supabase()
+    result = db.table("run_logs").select("*").eq("run_id", run_id) \
+        .order("created_at", desc=False).execute()
+    return {"logs": result.data}

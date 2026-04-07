@@ -1,64 +1,26 @@
-"""SQLite database for run history and settings."""
+"""Supabase database client for settings, runs, and logs."""
 
-import json
-from datetime import datetime
-from typing import Optional
+import os
+from supabase import create_client, Client
 
-from sqlalchemy import Column, String, Integer, Float, Text, DateTime, Boolean, create_engine
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import DeclarativeBase
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://qndliypxehqaveeuzwvg.supabase.co")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFuZGxpeXB4ZWhxYXZlZXV6d3ZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1NTcxNjgsImV4cCI6MjA5MTEzMzE2OH0.5KHO_4hutG7liDcOUS6houRX5V2YYkdp1-3lkTKUA20")
 
-from backend.core.config import settings
+_client: Client | None = None
 
 
-class Base(DeclarativeBase):
-    pass
-
-
-class Run(Base):
-    __tablename__ = "runs"
-
-    id = Column(String, primary_key=True)
-    countries = Column(Text)  # JSON list
-    date_str = Column(String(8))
-    status = Column(String(20), default="pending")  # pending, running, completed, failed
-    current_phase = Column(String(30), default="")
-    phase_status = Column(Text, default="{}")  # JSON dict
-    errors = Column(Text, default="[]")  # JSON list
-    newsletter_html = Column(Text, default="{}")  # JSON dict: country -> html
-    audit_iterations = Column(Integer, default=0)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    completed_at = Column(DateTime, nullable=True)
-
-    # Stats
-    total_collected = Column(Integer, default=0)
-    total_filtered = Column(Integer, default=0)
-    total_sent = Column(Integer, default=0)
-
-
-class ScheduleConfig(Base):
-    __tablename__ = "schedule_config"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    frequency = Column(String(20), default="weekly")
-    day_of_week = Column(String(20), default="Tuesday")
-    time = Column(String(5), default="08:00")
-    countries = Column(Text, default='["KR","RU","VN","TH","PH","PK"]')
-    is_active = Column(Boolean, default=True)
-    country_recipients = Column(Text, default="[]")  # JSON: [{"country":"KR","recipients":["a@b.com"]}]
-    days = Column(Integer, default=30)
-    updated_at = Column(DateTime, default=datetime.utcnow)
-
-
-engine = create_async_engine(settings.database_url, echo=False)
-async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+def get_supabase() -> Client:
+    global _client
+    if _client is None:
+        _client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    return _client
 
 
 async def init_db():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-
-async def get_session():
-    async with async_session() as session:
-        yield session
+    """Verify Supabase connection on startup."""
+    try:
+        db = get_supabase()
+        db.table("settings").select("id").limit(1).execute()
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Supabase connection check: {e}")
