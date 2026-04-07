@@ -53,15 +53,15 @@ export default function Dashboard() {
   const [runState, setRunState] = useState<RunState>("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [apiConnected, setApiConnected] = useState(false);
+  const [waking, setWaking] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    fetchRuns();
+    wakeAndFetch();
     pollRef.current = setInterval(fetchRuns, 5000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);
 
-  // Sync runState with active runs
   useEffect(() => {
     const active = runs.find((r) => r.status === "running");
     if (active && runState !== "starting") {
@@ -71,16 +71,37 @@ export default function Dashboard() {
     }
   }, [runs]);
 
+  async function wakeAndFetch() {
+    setWaking(true);
+    // Try up to 4 times (covers ~60s cold start)
+    for (let i = 0; i < 4; i++) {
+      try {
+        const res = await fetch("/api/runs", { signal: AbortSignal.timeout(20000) });
+        if (res.ok) {
+          const data = await res.json();
+          setRuns(data.runs || []);
+          setApiConnected(true);
+          setWaking(false);
+          return;
+        }
+      } catch {}
+      // Wait before retry
+      if (i < 3) await new Promise((r) => setTimeout(r, 5000));
+    }
+    setApiConnected(false);
+    setWaking(false);
+  }
+
   async function fetchRuns() {
     try {
-      const res = await fetch("/api/runs");
+      const res = await fetch("/api/runs", { signal: AbortSignal.timeout(10000) });
       if (res.ok) {
         const data = await res.json();
         setRuns(data.runs || []);
-        setApiConnected(true);
+        if (!apiConnected) setApiConnected(true);
       }
     } catch {
-      setApiConnected(false);
+      if (apiConnected) setApiConnected(false);
     }
   }
 
@@ -121,11 +142,28 @@ export default function Dashboard() {
           <div className="flex items-center gap-3 mt-2">
             <span className="text-gray-600 text-xs">Schedule: Every Tuesday 09:00 KST</span>
             <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${
-              apiConnected ? "bg-green-900/40 text-green-400" : "bg-red-900/40 text-red-400"
+              apiConnected ? "bg-green-900/40 text-green-400"
+                : waking ? "bg-yellow-900/40 text-yellow-400"
+                : "bg-red-900/40 text-red-400"
             }`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${apiConnected ? "bg-green-400" : "bg-red-400"}`} />
-              {apiConnected ? "API Connected" : "API Offline"}
+              {waking ? (
+                <>
+                  <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Waking up server...
+                </>
+              ) : (
+                <>
+                  <span className={`w-1.5 h-1.5 rounded-full ${apiConnected ? "bg-green-400" : "bg-red-400"}`} />
+                  {apiConnected ? "API Connected" : "API Offline — click to retry"}
+                </>
+              )}
             </span>
+            {!apiConnected && !waking && (
+              <button onClick={wakeAndFetch} className="text-xs text-blue-400 underline ml-1">Retry</button>
+            )}
           </div>
         </div>
 
