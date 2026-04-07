@@ -205,7 +205,7 @@ def _build_sector_block(sector: str, articles: list) -> str:
 <td style="padding:0 32px 24px 32px">
   <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #E5E7EB;border-radius:8px;overflow:hidden">
   <tr>
-    <td style="background:linear-gradient(135deg, {color} 0%, {NAVY} 100%);padding:12px 20px">
+    <td style="background-color:{NAVY};padding:12px 20px">
       <span style="color:#ffffff;font-size:14px;font-weight:700;letter-spacing:0.3px">{icon} {sector}</span>
       <span style="color:rgba(255,255,255,0.6);font-size:11px;float:right;padding-top:2px">{len(articles)}건</span>
     </td>
@@ -326,7 +326,7 @@ def build_newsletter_html(country: str, articles: list, days: int, insights: lis
 
 <!-- ═══ HEADER ═══ -->
 <tr>
-<td style="background:linear-gradient(135deg, {NAVY} 0%, #0D2240 100%);padding:36px 40px;text-align:center">
+<td style="background-color:{NAVY};padding:36px 40px;text-align:center">
   <table width="100%" cellpadding="0" cellspacing="0" border="0">
   <tr><td align="center">
     <table cellpadding="0" cellspacing="0" border="0">
