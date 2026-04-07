@@ -26,11 +26,20 @@ SECTOR_ICONS = {
     "윤활유규제": ("⚖️", "#7C3AED", "Regulation"),
 }
 
-SCORE_BADGES = {
+def score_to_level(score_30: int) -> int:
+    """Convert 30-point score to 5-level importance."""
+    if score_30 >= 24: return 5
+    if score_30 >= 18: return 4
+    if score_30 >= 13: return 3
+    if score_30 >= 10: return 2
+    return 1
+
+LEVEL_BADGES = {
     5: ("★★★★★", "#B45309", "#FEF3C7"),
     4: ("★★★★☆", "#1E40AF", "#DBEAFE"),
     3: ("★★★☆☆", "#065F46", "#D1FAE5"),
     2: ("★★☆☆☆", "#6B7280", "#F3F4F6"),
+    1: ("★☆☆☆☆", "#9CA3AF", "#F9FAFB"),
 }
 
 FONT_STACK = "'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR',Arial,Helvetica,sans-serif"
@@ -113,9 +122,8 @@ def _format_date(date_str: str) -> str:
 def _build_article_card(article: dict, idx: int) -> str:
     """Build a single article card HTML with score-based visual emphasis."""
     score = article.get("score", 0)
-    badge_text, badge_color, badge_bg = SCORE_BADGES.get(
-        min(max(score, 2), 5), ("★★☆☆☆", "#6B7280", "#F3F4F6")
-    )
+    level = score_to_level(score)
+    badge_text, badge_color, badge_bg = LEVEL_BADGES.get(level, ("★☆☆☆☆", "#9CA3AF", "#F9FAFB"))
     title = _esc(article.get("title_kr", article.get("title", "Untitled")))
     summary = _esc(article.get("summary_kr", article.get("snippet", "")))
     source = _esc(article.get("source", ""))
@@ -135,11 +143,11 @@ def _build_article_card(article: dict, idx: int) -> str:
     global_tag = '<span style="display:inline-block;background:#6366F1;color:#fff;font-size:9px;padding:1px 6px;border-radius:3px;font-weight:700;margin-left:6px;vertical-align:middle">GLOBAL</span>' if scope == "global" else ""
 
     # Score 5 gets highlighted card with gold left border
-    if score >= 5:
+    if level >= 5:
         card_bg = "#FFFBEB"
         left_border = f"border-left:4px solid #F59E0B;"
         hot_tag = '<span style="display:inline-block;background:#DC2626;color:#fff;font-size:10px;padding:1px 6px;border-radius:3px;font-weight:700;margin-left:6px;vertical-align:middle">HOT</span>'
-    elif score >= 4:
+    elif level >= 4:
         card_bg = "#F8FAFC"
         left_border = f"border-left:3px solid #3B82F6;"
         hot_tag = ""
@@ -154,7 +162,7 @@ def _build_article_card(article: dict, idx: int) -> str:
   <tr><td style="padding:18px 20px">
     <table width="100%" cellpadding="0" cellspacing="0" border="0">
     <tr><td>
-      <span style="display:inline-block;background-color:{badge_bg};color:{badge_color};font-size:10px;padding:3px 10px;border-radius:12px;font-weight:700;letter-spacing:0.5px">{badge_text}</span>
+      <span style="display:inline-block;background-color:{badge_bg};color:{badge_color};font-size:10px;padding:3px 10px;border-radius:12px;font-weight:700;letter-spacing:0.5px">{badge_text} {score}/30</span>
       {hot_tag}{global_tag}
     </td></tr>
     <tr><td style="padding-top:8px">

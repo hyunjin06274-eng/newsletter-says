@@ -10,25 +10,33 @@ from backend.agent.state import NewsletterState, Article
 logger = logging.getLogger(__name__)
 
 SCORING_PROMPT = """You are an MI analyst for SK Enmove, a lubricant company.
-Score this article on a scale of 0-5 for relevance to FINISHED lubricant product sales strategy.
+Score this article on a scale of 0-30 for relevance to FINISHED lubricant product sales strategy.
 
 The core question: "Does this news affect how SK Enmove sells lubricants?"
 
-Scoring criteria:
-- 5: Direct competitor activity — new lubricant product launch, pricing change, promotion, distribution channel expansion, OEM partnership
-- 4: Lubricant regulation/policy — API/ACEA/ILSAC specification update, import tariff change, environmental regulation affecting lubricant formulation
-- 3: Forward industry trends DIRECTLY affecting lubricant demand:
-     * Vehicle market: EV transition pace (affects ICE oil demand), hybrid growth (still needs oil), new car sales volume
-     * Commercial vehicle/truck/bus fleet expansion (HDDO demand)
-     * Marine/shipping fleet changes (marine lubricant demand)
-     * Construction/mining equipment market (industrial lubricant demand)
-     * Manufacturing/factory machinery trends (cutting fluid, hydraulic oil)
-     * Motorcycle market growth in SEA (MCO demand)
-     * Agricultural machinery/tractor market
-- 2: Crude oil/base oil pricing trends affecting lubricant manufacturing cost
-     * Refinery capacity changes impacting base oil supply
-     * Group II/III base oil market shifts
-- 1: Tangentially related — only if "anyone would obviously see the connection" to lubricants
+Scoring dimensions (each 0-10, total max 30):
+
+A. Sales Relevance (0-10):
+- 10: Direct competitor new product/promotion/channel in target country
+- 8: Lubricant regulation change (API/ACEA/tariff) in target country
+- 6: Vehicle/equipment sales data directly affecting lubricant demand
+- 4: Base oil/crude price affecting manufacturing cost
+- 2: Tangential industry news
+- 0: Irrelevant
+
+B. Country Specificity (0-10):
+- 10: Exclusively about target country market, local companies, local data
+- 7: Primarily about target country with some global context
+- 4: Regional (Asia/Europe) news with some target country relevance
+- 1: Pure global news with indirect country impact
+- 0: About a different specific country
+
+C. Actionability (0-10):
+- 10: Requires immediate response (competitor launch, regulation deadline)
+- 7: Should influence quarterly planning
+- 4: Good-to-know market intelligence
+- 2: Background context only
+- 0: No actionable insight
 - 0: Irrelevant — crypto, real estate, stock market, generic politics, entertainment, food, fashion
 
 STRICT EXCLUSION rules:
@@ -41,17 +49,10 @@ STRICT EXCLUSION rules:
 CRITICAL — COUNTRY vs GLOBAL classification:
 Target country: {country}
 
-Classify this article:
-1. "local" = specifically about {country} market (companies, regulations, sales data in {country})
-2. "global" = industry-wide news that affects ALL markets (API spec changes, crude oil price, global OEM trends)
-3. "other_country" = specifically about a DIFFERENT country's market → score 0, REJECT
-
-Scoring priority (country relevance > domain relevance):
-- {country}-specific lubricant competitor news: score 5
-- {country}-specific regulation/policy: score 5
-- {country}-specific vehicle/industry data: score 4
-- Global lubricant industry news (API/ACEA, crude oil, global M&A): score 3, tag as "global"
-- Other country's market news: score 0
+Classify scope:
+- "local" = specifically about {country} market
+- "global" = industry-wide, affects all markets
+- "other_country" = about a DIFFERENT country → total score 0
 
 Article:
 Title: {title}
@@ -60,7 +61,7 @@ Source: {source}
 Target country: {country}
 Domain: {domain}
 
-Respond in JSON: {{"score": N, "scope": "local|global|other_country", "sector": "윤활유동향|경쟁사활동|전방산업동향|윤활유규제", "reason": "brief Korean reason", "tags": ["tag1", "tag2"]}}
+Respond in JSON: {{"score_sales": 0-10, "score_country": 0-10, "score_action": 0-10, "scope": "local|global|other_country", "sector": "윤활유동향|경쟁사활동|전방산업동향|윤활유규제", "reason": "brief Korean reason", "tags": ["tag1"]}}
 """
 
 NEGATIVE_KEYWORDS = [
@@ -125,7 +126,13 @@ async def score_single_article(article: Article, client) -> Article:
                 article["score"] = 0
                 article["score_reason"] = "Other country - rejected"
             else:
-                article["score"] = data.get("score", 0)
+                s1 = min(data.get("score_sales", 0), 10)
+                s2 = min(data.get("score_country", 0), 10)
+                s3 = min(data.get("score_action", 0), 10)
+                article["score"] = s1 + s2 + s3  # 0-30 total
+                article["score_sales"] = s1
+                article["score_country"] = s2
+                article["score_action"] = s3
                 article["score_reason"] = data.get("reason", "")
             article["tags"] = data.get("tags", [])
             article["sector"] = data.get("sector", "윤활유동향")
@@ -169,7 +176,7 @@ async def score_articles(state: NewsletterState) -> dict:
                 print(f"  📊 [{country}] Scoring {i}/{len(to_score)}: {title_short}...", flush=True)
                 scored_article = await score_single_article(article, client)
                 s = scored_article.get("score", 0)
-                if s >= 2:
+                if s >= 10:
                     scored_articles.append(scored_article)
                     print(f"  📊 [{country}] -> score={s} ✓", flush=True)
                 else:
