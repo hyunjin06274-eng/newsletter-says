@@ -123,21 +123,22 @@ export default function SettingsPage() {
         country_recipients: countryRecipients,
       };
 
-      // Always save to localStorage
+      // Always save to localStorage first (instant)
       saveToLocal(settingsPayload);
+      setSaved(true);
+      setSaving(false);
+      setTimeout(() => setSaved(false), 2000);
 
-      // Also try API
-      await fetch("/api/settings", {
+      // Also try API in background (don't block UI)
+      fetch("/api/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(settingsPayload),
-      });
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+      }).catch(() => {});
     } catch (e) {
       console.error("Save failed:", e);
+      setSaving(false);
     }
-    setSaving(false);
   }
 
   function toggleCountry(code: string) {
@@ -234,38 +235,26 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Countries & Recipients */}
+      {/* Recipients per Country */}
       <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
-        <h2 className="text-lg font-semibold mb-6">Countries & Recipients</h2>
-        <div className="space-y-4">
+        <h2 className="text-lg font-semibold mb-2">Recipients</h2>
+        <p className="text-gray-500 text-sm mb-6">Each country newsletter will be sent to these email addresses.</p>
+        <div className="space-y-3">
           {ALL_COUNTRIES.map(({ code, name, flag }) => (
-            <div key={code} className="flex items-start gap-4 p-4 bg-gray-800/50 rounded-lg">
-              <button
-                onClick={() => toggleCountry(code)}
-                className={`mt-1 w-5 h-5 rounded border flex items-center justify-center text-xs transition-colors ${
-                  activeCountries.includes(code)
-                    ? "bg-red-600 border-red-600 text-white"
-                    : "border-gray-600 text-transparent"
-                }`}
-              >
-                {activeCountries.includes(code) ? "\u2713" : ""}
-              </button>
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xl">{flag}</span>
-                  <span className="font-medium">{name}</span>
-                  <span className="text-gray-500 text-sm">({code})</span>
-                </div>
-                <input
-                  type="text"
-                  placeholder="recipient1@email.com, recipient2@email.com"
-                  value={recipients[code] || ""}
-                  onChange={(e) =>
-                    setRecipients((prev) => ({ ...prev, [code]: e.target.value }))
-                  }
-                  className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm text-gray-300 placeholder-gray-600"
-                />
+            <div key={code} className="flex items-center gap-4 p-4 bg-gray-800/50 rounded-lg">
+              <div className="flex items-center gap-2 w-36 shrink-0">
+                <span className="text-xl">{flag}</span>
+                <span className="font-medium text-sm">{name}</span>
               </div>
+              <input
+                type="text"
+                placeholder="email1@company.com, email2@company.com"
+                value={recipients[code] || ""}
+                onChange={(e) =>
+                  setRecipients((prev) => ({ ...prev, [code]: e.target.value }))
+                }
+                className="flex-1 bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm text-gray-300 placeholder-gray-600 focus:border-blue-500 focus:outline-none"
+              />
             </div>
           ))}
         </div>
