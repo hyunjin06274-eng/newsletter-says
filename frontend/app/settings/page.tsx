@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { apiFetch } from "../api-client";
 
 const ALL_COUNTRIES = [
   { code: "KR", name: "Korea", flag: "\uD83C\uDDF0\uD83C\uDDF7" },
@@ -99,7 +100,7 @@ export default function SettingsPage() {
 
     // 2. Then try API — only overwrite if API has recipients data
     try {
-      const res = await fetch("/api/settings");
+      const res = await apiFetch("/api/settings");
       if (res.ok) {
         const data: Settings = await res.json();
         const apiHasRecipients = (data.schedule.country_recipients || []).length > 0;
@@ -158,7 +159,7 @@ export default function SettingsPage() {
       try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 15000);
-        const res = await fetch("/api/settings", {
+        const res = await apiFetch("/api/settings", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(settingsPayload),

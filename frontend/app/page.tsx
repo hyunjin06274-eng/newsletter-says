@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { apiFetch } from "./api-client";
 
 const COUNTRY_FLAGS: Record<string, string> = {
   KR: "\uD83C\uDDF0\uD83C\uDDF7",
@@ -76,7 +77,7 @@ export default function Dashboard() {
     // Try up to 4 times (covers ~60s cold start)
     for (let i = 0; i < 4; i++) {
       try {
-        const res = await fetch("/api/runs", { signal: AbortSignal.timeout(20000) });
+        const res = await apiFetch("/api/runs", { signal: AbortSignal.timeout(20000) });
         if (res.ok) {
           const data = await res.json();
           setRuns(data.runs || []);
@@ -94,7 +95,7 @@ export default function Dashboard() {
 
   async function fetchRuns() {
     try {
-      const res = await fetch("/api/runs", { signal: AbortSignal.timeout(10000) });
+      const res = await apiFetch("/api/runs", { signal: AbortSignal.timeout(10000) });
       if (res.ok) {
         const data = await res.json();
         setRuns(data.runs || []);
@@ -110,7 +111,7 @@ export default function Dashboard() {
     setErrorMsg("");
 
     try {
-      const res = await fetch("/api/runs", {
+      const res = await apiFetch("/api/runs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ countries: Object.keys(COUNTRY_FLAGS), days: 30 }),
