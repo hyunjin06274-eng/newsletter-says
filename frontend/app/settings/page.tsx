@@ -41,6 +41,7 @@ export default function SettingsPage() {
   const [activeCountries, setActiveCountries] = useState<string[]>([]);
   const [isActive, setIsActive] = useState(true);
   const [days, setDays] = useState(30);
+  const [globalRecipients, setGlobalRecipients] = useState("");
   const [recipients, setRecipients] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -76,7 +77,11 @@ export default function SettingsPage() {
 
     const r: Record<string, string> = {};
     for (const cr of data.schedule.country_recipients || []) {
-      r[cr.country] = cr.recipients.join(", ");
+      if (cr.country === "ALL") {
+        setGlobalRecipients(cr.recipients.join(", "));
+      } else {
+        r[cr.country] = cr.recipients.join(", ");
+      }
     }
     setRecipients(r);
   }
@@ -113,6 +118,14 @@ export default function SettingsPage() {
           country,
           recipients: emailStr.split(",").map((e) => e.trim()).filter(Boolean),
         }));
+
+      // Add global recipients as "ALL"
+      if (globalRecipients.trim()) {
+        countryRecipients.unshift({
+          country: "ALL",
+          recipients: globalRecipients.split(",").map((e) => e.trim()).filter(Boolean),
+        });
+      }
 
       const settingsPayload = {
         frequency,
@@ -235,25 +248,40 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Recipients per Country */}
+      {/* Recipients */}
       <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
-        <h2 className="text-lg font-semibold mb-2">Recipients</h2>
-        <p className="text-gray-500 text-sm mb-6">Each country newsletter will be sent to these email addresses.</p>
-        <div className="space-y-3">
+        <h2 className="text-lg font-semibold mb-6">Recipients</h2>
+
+        {/* Global recipients - all countries */}
+        <div className="p-4 bg-gray-800/80 rounded-lg border border-gray-700 mb-6">
+          <label className="block text-sm font-medium text-white mb-1">All Countries (common)</label>
+          <p className="text-gray-500 text-xs mb-3">Every newsletter will be sent to these addresses.</p>
+          <input
+            type="text"
+            placeholder="team@company.com, manager@company.com"
+            value={globalRecipients}
+            onChange={(e) => setGlobalRecipients(e.target.value)}
+            className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2.5 text-sm text-gray-200 placeholder-gray-600 focus:border-blue-500 focus:outline-none"
+          />
+        </div>
+
+        {/* Per-country additional recipients */}
+        <p className="text-gray-500 text-xs mb-3">Country-specific (additional recipients for that country only):</p>
+        <div className="space-y-2">
           {ALL_COUNTRIES.map(({ code, name, flag }) => (
-            <div key={code} className="flex items-center gap-4 p-4 bg-gray-800/50 rounded-lg">
-              <div className="flex items-center gap-2 w-36 shrink-0">
-                <span className="text-xl">{flag}</span>
-                <span className="font-medium text-sm">{name}</span>
+            <div key={code} className="flex items-center gap-3 px-4 py-3 bg-gray-800/30 rounded-lg">
+              <div className="flex items-center gap-2 w-32 shrink-0">
+                <span className="text-lg">{flag}</span>
+                <span className="text-sm text-gray-300">{name}</span>
               </div>
               <input
                 type="text"
-                placeholder="email1@company.com, email2@company.com"
+                placeholder="additional@company.com"
                 value={recipients[code] || ""}
                 onChange={(e) =>
                   setRecipients((prev) => ({ ...prev, [code]: e.target.value }))
                 }
-                className="flex-1 bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm text-gray-300 placeholder-gray-600 focus:border-blue-500 focus:outline-none"
+                className="flex-1 bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm text-gray-400 placeholder-gray-700 focus:border-blue-500 focus:outline-none"
               />
             </div>
           ))}
