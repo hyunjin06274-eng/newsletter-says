@@ -148,7 +148,7 @@ async def send_newsletter(state: NewsletterState) -> dict:
 
     for country, html in newsletters.items():
         country_name = COUNTRY_NAMES.get(country, country)
-        subject = f"[SK엔무브 MI] {country_name} 윤활유 시장 동향 ({date_str[:4]}.{date_str[4:6]}.{date_str[6:]})"
+        subject = f"{country_name} 윤활유 시장 뉴스레터 ({date_str[:4]}.{date_str[4:6]}.{date_str[6:]})"
 
         # Merge global + country-specific recipients
         recipients = list(global_recipients)
