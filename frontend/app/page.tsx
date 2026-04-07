@@ -129,10 +129,12 @@ export default function Dashboard() {
           </div>
         </div>
 
+        <div className="flex gap-3">
+        {/* Start New Run (dry run - no email) */}
         <button
           onClick={handleStartRun}
           disabled={isRunning}
-          className={`px-6 py-3 text-white rounded-lg font-medium transition-all flex items-center gap-2 ${
+          className={`px-5 py-3 text-white rounded-lg font-medium transition-all flex items-center gap-2 text-sm ${
             isRunning
               ? "bg-blue-600 cursor-not-allowed"
               : "bg-red-600 hover:bg-red-700 hover:scale-105"
@@ -156,6 +158,27 @@ export default function Dashboard() {
             </>
           )}
         </button>
+
+        {/* One-time Send */}
+        <button
+          onClick={() => {
+            if (confirm("6개국 뉴스레터를 즉시 생성하고 이메일 발송하시겠습니까?")) {
+              handleStartRun();
+            }
+          }}
+          disabled={isRunning}
+          className={`px-5 py-3 rounded-lg font-medium transition-all flex items-center gap-2 text-sm ${
+            isRunning
+              ? "bg-gray-800 text-gray-600 cursor-not-allowed"
+              : "bg-emerald-600 hover:bg-emerald-700 text-white hover:scale-105"
+          }`}
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+          One-time Send
+        </button>
+        </div>
       </div>
 
       {/* Error Banner */}
