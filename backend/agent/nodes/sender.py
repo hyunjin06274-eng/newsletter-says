@@ -106,34 +106,65 @@ async def send_newsletter(state: NewsletterState) -> dict:
     sender = os.environ.get("GMAIL_SENDER", "skenbizst@gmail.com")
     send_results: dict[str, bool] = {}
 
-    # Load recipients from Supabase Settings
+    # Load recipients — priority: recipients table → settings.country_recipients → DEFAULT_RECIPIENTS env
     global_recipients = []
     country_extra: dict[str, list[str]] = {}
-    try:
+
+    supabase_url = os.environ.get("SUPABASE_URL", "")
+    supabase_key = os.environ.get("SUPABASE_KEY", "")
+
+    if supabase_url and supabase_key:
         import requests as _req
-        supabase_url = os.environ.get("SUPABASE_URL", "")
-        supabase_key = os.environ.get("SUPABASE_KEY", "")
-        if supabase_url and supabase_key:
+        headers = {"apikey": supabase_key, "Authorization": f"Bearer {supabase_key}"}
+
+        # 1순위: recipients 테이블
+        try:
             resp = _req.get(
-                f"{supabase_url}/rest/v1/settings?order=id.desc&limit=1&select=country_recipients",
-                headers={"apikey": supabase_key, "Authorization": f"Bearer {supabase_key}"},
+                f"{supabase_url}/rest/v1/recipients?is_active=eq.true&select=email,country",
+                headers=headers,
                 timeout=10,
             )
             if resp.ok and resp.json():
-                for cr in resp.json()[0].get("country_recipients", []):
-                    if cr.get("country") == "ALL":
-                        global_recipients = cr.get("recipients", [])
+                for row in resp.json():
+                    email = row.get("email", "").strip()
+                    country = row.get("country", "ALL")
+                    if not email:
+                        continue
+                    if country == "ALL":
+                        global_recipients.append(email)
                     else:
-                        country_extra[cr["country"]] = cr.get("recipients", [])
-                logger.info(f"Loaded recipients: global={global_recipients}, extras={list(country_extra.keys())}")
-                print(f"Loaded recipients: global={global_recipients}, extras={list(country_extra.keys())}", flush=True)
-    except Exception as e:
-        logger.warning(f"Failed to load recipients from Supabase: {e}")
+                        country_extra.setdefault(country, []).append(email)
+                logger.info(f"[recipients table] global={global_recipients}, extras={dict(country_extra)}")
+                print(f"[recipients table] global={global_recipients}, extras={dict(country_extra)}", flush=True)
+        except Exception as e:
+            logger.warning(f"Failed to load from recipients table: {e}")
 
-    # Fallback to env
-    if not global_recipients:
+        # 2순위: settings.country_recipients (recipients 테이블이 비어있을 때)
+        if not global_recipients and not country_extra:
+            try:
+                resp = _req.get(
+                    f"{supabase_url}/rest/v1/settings?order=id.desc&limit=1&select=country_recipients",
+                    headers=headers,
+                    timeout=10,
+                )
+                if resp.ok and resp.json():
+                    for cr in resp.json()[0].get("country_recipients", []):
+                        if cr.get("country") == "ALL":
+                            global_recipients = cr.get("recipients", [])
+                        else:
+                            country_extra[cr["country"]] = cr.get("recipients", [])
+                    logger.info(f"[settings fallback] global={global_recipients}, extras={list(country_extra.keys())}")
+                    print(f"[settings fallback] global={global_recipients}, extras={list(country_extra.keys())}", flush=True)
+            except Exception as e:
+                logger.warning(f"Failed to load from settings: {e}")
+
+    # 3순위: DEFAULT_RECIPIENTS 환경변수
+    if not global_recipients and not country_extra:
         env_recip = os.environ.get("DEFAULT_RECIPIENTS", "").split(",")
         global_recipients = [r.strip() for r in env_recip if r.strip()]
+        if global_recipients:
+            logger.info(f"[env fallback] DEFAULT_RECIPIENTS={global_recipients}")
+            print(f"[env fallback] DEFAULT_RECIPIENTS={global_recipients}", flush=True)
 
     try:
         service = await asyncio.to_thread(get_gmail_service)
