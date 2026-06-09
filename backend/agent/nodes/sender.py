@@ -126,14 +126,24 @@ async def send_newsletter(state: NewsletterState) -> dict:
             )
             if resp.ok and resp.json():
                 for row in resp.json():
-                    email = row.get("email", "").strip()
+                    raw_email = row.get("email", "")
                     country = row.get("country", "ALL")
-                    if not email:
-                        continue
-                    if country == "ALL":
-                        global_recipients.append(email)
+                    # JSON 배열 문자열로 저장된 경우 파싱
+                    if isinstance(raw_email, str) and raw_email.startswith("["):
+                        try:
+                            emails = json.loads(raw_email)
+                        except Exception:
+                            emails = [raw_email]
                     else:
-                        country_extra.setdefault(country, []).append(email)
+                        emails = [raw_email]
+                    for email in emails:
+                        email = str(email).strip()
+                        if not email or "@" not in email:
+                            continue
+                        if country == "ALL":
+                            global_recipients.append(email)
+                        else:
+                            country_extra.setdefault(country, []).append(email)
                 logger.info(f"[recipients table] global={global_recipients}, extras={dict(country_extra)}")
                 print(f"[recipients table] global={global_recipients}, extras={dict(country_extra)}", flush=True)
         except Exception as e:
