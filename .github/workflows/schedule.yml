@@ -45,13 +45,20 @@ jobs:
       - name: Install dependencies
         run: pip install -r backend/requirements.txt langgraph langchain-core langchain-anthropic anthropic feedparser beautifulsoup4 lxml trafilatura deep-translator google-api-python-client google-auth google-auth-httplib2 google-auth-oauthlib google-genai pyyaml tenacity python-dateutil
 
-      - name: Update Supabase runs to "in_progress"
+      - name: Insert Supabase run row
         run: |
-          curl -s -X PATCH "${{ secrets.SUPABASE_URL }}/rest/v1/runs?status=eq.running" \
+          RUN_ID=$(python3 -c "import uuid; print(str(uuid.uuid4()))")
+          DATE_STR=$(date +%Y%m%d)
+          COUNTRIES='["KR","RU","VN","TH","PH","PK"]'
+          echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
+          echo "DATE_STR=$DATE_STR" >> $GITHUB_ENV
+          curl -s -X POST "${{ secrets.SUPABASE_URL }}/rest/v1/runs" \
             -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}" \
             -H "Content-Type: application/json" \
-            -d '{"current_phase": "collection"}' || true
+            -H "Prefer: return=minimal" \
+            -d "{\"id\":\"$RUN_ID\",\"date_str\":\"$DATE_STR\",\"countries\":$COUNTRIES,\"status\":\"running\",\"current_phase\":\"collection\"}" || true
+          echo "Supabase run created: $RUN_ID"
 
       - name: Run newsletter pipeline
         run: |
@@ -108,24 +115,25 @@ jobs:
           INPUT_COUNTRIES: ${{ github.event.inputs.countries || 'KR,RU,VN,TH,PH,PK' }}
           INPUT_DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
 
-      - name: Update Supabase runs to "completed"
+      - name: Update Supabase run to "completed"
         if: success()
         run: |
-          curl -s -X PATCH "${{ secrets.SUPABASE_URL }}/rest/v1/runs?status=eq.running" \
+          curl -s -X PATCH "${{ secrets.SUPABASE_URL }}/rest/v1/runs?id=eq.$RUN_ID" \
             -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}" \
             -H "Content-Type: application/json" \
-            -d '{"status": "completed", "current_phase": "complete"}' || true
-          echo "Supabase runs updated to completed"
+            -d '{"status": "completed", "current_phase": "complete", "completed_at": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' || true
+          echo "Supabase run $RUN_ID updated to completed"
 
-      - name: Update Supabase runs to "failed" on error
+      - name: Update Supabase run to "failed"
         if: failure()
         run: |
-          curl -s -X PATCH "${{ secrets.SUPABASE_URL }}/rest/v1/runs?status=eq.running" \
+          curl -s -X PATCH "${{ secrets.SUPABASE_URL }}/rest/v1/runs?id=eq.$RUN_ID" \
             -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}" \
             -H "Content-Type: application/json" \
-            -d '{"status": "failed", "current_phase": "error"}' || true
+            -d '{"status": "failed", "current_phase": "error", "completed_at": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' || true
+          echo "Supabase run $RUN_ID updated to failed"
 
       - name: Upload newsletters
         if: always()
