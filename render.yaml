@@ -23,9 +23,3 @@ services:
         sync: false
       - key: FRONTEND_URL
         value: https://frontend-gamma-eight-32.vercel.app
-      - key: GH_DISPATCH_TOKEN
-        sync: false
-      - key: SUPABASE_URL
-        sync: false
-      - key: SUPABASE_KEY
-        sync: false

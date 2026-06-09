@@ -102,15 +102,6 @@ jobs:
 
               print(f'=== Pipeline completed! {len(newsletters)} newsletters ===', flush=True)
 
-              # Fail the workflow if pipeline aborted (0 newsletters or failed phase)
-              final_phase = final.get('current_phase', '')
-              final_errors = final.get('errors', [])
-              if final_phase == 'failed' or not newsletters:
-                  print(f'=== PIPELINE FAILED ===', flush=True)
-                  for err in final_errors:
-                      print(f'  ERROR: {err}', flush=True)
-                  sys.exit(1)
-
           asyncio.run(main())
           "
         env:

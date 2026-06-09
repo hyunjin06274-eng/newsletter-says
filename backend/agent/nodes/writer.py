@@ -1,4 +1,4 @@
-"""Phase 3: Professional HTML newsletter generation (Outlook-compatible)."""
+"""Phase 3: Professional HTML newsletter generation."""
 
 import json
 import logging
@@ -20,24 +20,83 @@ COUNTRY_FLAGS = {
 }
 
 SECTOR_ICONS = {
-    "윤활유동향": ("윤활유동향", "#D97706"),
-    "경쟁사활동": ("경쟁사활동", "#DC2626"),
-    "전방산업동향": ("전방산업동향", "#2563EB"),
-    "윤활유규제": ("윤활유규제", "#7C3AED"),
+    "윤활유동향": ("🛢️", "#D97706", "Lubricant Trends"),
+    "경쟁사활동": ("🏆", "#DC2626", "Competitor Activity"),
+    "전방산업동향": ("🚗", "#2563EB", "Forward Industry"),
+    "윤활유규제": ("⚖️", "#7C3AED", "Regulation"),
 }
 
-FONT_STACK = "'Malgun Gothic','맑은 고딕',Arial,sans-serif"
+def score_to_level(score_30: int) -> int:
+    """Convert 30-point score to 5-level importance."""
+    if score_30 >= 24: return 5
+    if score_30 >= 18: return 4
+    if score_30 >= 13: return 3
+    if score_30 >= 10: return 2
+    return 1
+
+LEVEL_BADGES = {
+    5: ("★★★★★", "#B45309", "#FEF3C7"),
+    4: ("★★★★☆", "#1E40AF", "#DBEAFE"),
+    3: ("★★★☆☆", "#065F46", "#D1FAE5"),
+    2: ("★★☆☆☆", "#6B7280", "#F3F4F6"),
+    1: ("★☆☆☆☆", "#9CA3AF", "#F9FAFB"),
+}
+
+FONT_STACK = "'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR',Arial,Helvetica,sans-serif"
 BRAND_RED = "#E5191E"
 NAVY = "#1B3C6E"
+DARK_BG = "#0F172A"
+CARD_BG = "#1E293B"
 
+NEWSLETTER_PROMPT = """You are a premium newsletter designer for SK Enmove's Global MI (Market Intelligence) team.
+Create a STUNNING, professional HTML newsletter in Korean for the {country_name} lubricant market.
 
-def score_to_stars(score_30: int) -> str:
-    """Convert 30-point score to 5-star unicode string (0.5 step)."""
-    stars_raw = round((score_30 / 30) * 5 * 2) / 2
-    full = int(stars_raw)
-    half = 1 if (stars_raw - full) >= 0.5 else 0
-    empty = 5 - full - half
-    return "\u2605" * full + ("\u00BD" if half else "") + "\u2606" * empty
+Articles data:
+{articles_json}
+
+{audit_feedback}
+
+=== STRICT DESIGN REQUIREMENTS ===
+
+1. STRUCTURE (3 sections, clearly separated):
+   A. 📋 핵심 인사이트 (Executive Summary)
+      - 4-5 bullet points with red accent markers
+      - Each insight must reference specific data from the articles
+      - Business-critical tone, no fluff
+
+   B. 📰 섹터별 주요 뉴스 (Sector News)
+      - Group articles by sector: 윤활유동향, 경쟁사활동, 전방산업동향, 윤활유규제
+      - Each sector has a colored header bar
+      - Each article card shows: score badge, title (linked), Korean summary, source+date
+      - Score badge: 5=gold, 4=blue, 3=green (star ratings)
+
+   C. 💡 마케팅 전략 제언 (Strategic Recommendations)
+      - 3-5 numbered, specific, actionable recommendations
+      - Each must tie back to a specific news item or trend
+      - Format: Bold title + 1-2 sentence explanation
+
+2. VISUAL DESIGN (Email-safe, must look PREMIUM):
+   - Background: #f4f4f4
+   - Container: white, max-width 680px, centered, subtle shadow
+   - Header: Dark navy gradient (#1B3C6E → #0D2240), SK enmove red badge
+   - Section headers: Clean, bold, with colored left border accent
+   - Article cards: Light background, 1px border, 8px border-radius
+   - Score badges: Colored pills (gold/blue/green based on score)
+   - Typography: 'Malgun Gothic' stack, line-height 1.6
+   - Footer: Light gray, subtle, with disclaimer
+   - All CSS must be INLINE (no <style> blocks, no external CSS)
+   - Use TABLE layout for email compatibility (not div/flexbox)
+   - NO external images, fonts, or resources
+
+3. CONTENT RULES:
+   - ALL text in Korean (titles, summaries, insights, recommendations)
+   - Every article must link to its source URL
+   - Show collection period: "최근 {days}일" in the header
+   - Date format: YYYY.MM.DD
+   - No hallucinated data — only reference what's in the articles
+
+Output the COMPLETE HTML document. No markdown code fences. Start with <!DOCTYPE html>.
+"""
 
 
 def _esc(text: str) -> str:
@@ -54,15 +113,17 @@ def _format_date(date_str: str) -> str:
         dt = parsedate_to_datetime(date_str)
         return dt.strftime("%Y.%m.%d")
     except Exception:
+        # Already formatted or unknown format
         if "." in date_str and len(date_str) <= 12:
             return date_str
         return date_str[:10] if len(date_str) > 10 else date_str
 
 
 def _build_article_card(article: dict, idx: int) -> str:
-    """Build a single article card HTML — Outlook safe, no background highlights."""
+    """Build a single article card HTML with score-based visual emphasis."""
     score = article.get("score", 0)
-    stars = score_to_stars(score)
+    level = score_to_level(score)
+    badge_text, badge_color, badge_bg = LEVEL_BADGES.get(level, ("★☆☆☆☆", "#9CA3AF", "#F9FAFB"))
     title = _esc(article.get("title_kr", article.get("title", "Untitled")))
     summary = _esc(article.get("summary_kr", article.get("snippet", "")))
     source = _esc(article.get("source", ""))
@@ -71,34 +132,55 @@ def _build_article_card(article: dict, idx: int) -> str:
     date = _format_date(article.get("published_date", ""))
 
     if url_valid and url and url != "#":
-        title_html = f'<a href="{url}" style="color:{NAVY};font-size:15px;font-weight:bold;text-decoration:none;font-family:{FONT_STACK}" target="_blank">{title}</a>'
-        source_link = f' · <a href="{url}" style="color:#3B82F6;text-decoration:none;font-size:11px;font-weight:bold;font-family:{FONT_STACK}" target="_blank">원문보기</a>'
+        title_html = f'<a href="{url}" style="color:{NAVY};font-size:15px;font-weight:700;text-decoration:none;line-height:1.5" target="_blank">{title}</a>'
+        source_link = f' · <a href="{url}" style="color:#3B82F6;text-decoration:none;font-size:11px;font-weight:600" target="_blank">원문보기 →</a>'
     else:
-        title_html = f'<span style="color:{NAVY};font-size:15px;font-weight:bold;font-family:{FONT_STACK}">{title}</span>'
+        title_html = f'<span style="color:{NAVY};font-size:15px;font-weight:700;line-height:1.5">{title}</span>'
         source_link = ""
 
+    # Global tag
     scope = article.get("scope", "local")
-    global_tag = '<span style="display:inline;color:#6366F1;font-size:10px;font-weight:bold;font-family:Arial,sans-serif;margin-left:6px">[GLOBAL]</span>' if scope == "global" else ""
+    global_tag = '<span style="display:inline-block;background:#6366F1;color:#fff;font-size:9px;padding:1px 6px;border-radius:3px;font-weight:700;margin-left:6px;vertical-align:middle">GLOBAL</span>' if scope == "global" else ""
+
+    # Score 5 gets highlighted card with gold left border
+    if level >= 5:
+        card_bg = "#FFFBEB"
+        left_border = f"border-left:4px solid #F59E0B;"
+        hot_tag = '<span style="display:inline-block;background:#DC2626;color:#fff;font-size:10px;padding:1px 6px;border-radius:3px;font-weight:700;margin-left:6px;vertical-align:middle">HOT</span>'
+    elif level >= 4:
+        card_bg = "#F8FAFC"
+        left_border = f"border-left:3px solid #3B82F6;"
+        hot_tag = ""
+    else:
+        card_bg = "#ffffff"
+        left_border = ""
+        hot_tag = ""
 
     return f"""<tr>
-<td style="padding:16px 20px;border-bottom:1px solid #E5E7EB;font-family:{FONT_STACK}">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0">
-  <tr><td style="font-family:{FONT_STACK}">
-    <span style="color:#B45309;font-size:13px;font-weight:bold;font-family:{FONT_STACK}">{stars}</span>{global_tag}
-  </td></tr>
-  <tr><td style="padding-top:6px;font-family:{FONT_STACK}">
-    {title_html}
-  </td></tr>
-  <tr><td style="padding-top:6px;font-family:{FONT_STACK}">
-    <span style="font-size:13px;color:#4B5563;line-height:1.7;font-family:{FONT_STACK}">{summary}</span>
-  </td></tr>
-  <tr><td style="padding-top:8px;font-family:{FONT_STACK}">
-    <span style="font-size:11px;color:#9CA3AF;font-family:{FONT_STACK}">{source}{" · " + date if date else ""}{source_link}</span>
-    {_build_related_sources(article)}
+<td style="padding:0">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:{card_bg};{left_border}">
+  <tr><td style="padding:18px 20px">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr><td>
+      <span style="display:inline-block;background-color:{badge_bg};color:{badge_color};font-size:10px;padding:3px 10px;border-radius:12px;font-weight:700;letter-spacing:0.5px">{badge_text} {score}/30</span>
+      {hot_tag}{global_tag}
+    </td></tr>
+    <tr><td style="padding-top:8px">
+      {title_html}
+    </td></tr>
+    <tr><td style="padding-top:8px">
+      <span style="font-size:13px;color:#4B5563;line-height:1.75;display:block">{summary}</span>
+    </td></tr>
+    <tr><td style="padding-top:10px">
+      <span style="font-size:11px;color:#9CA3AF">{source}{' · ' + date if date else ''}{source_link}</span>
+      {_build_related_sources(article)}
+    </td></tr>
+    </table>
   </td></tr>
   </table>
 </td>
-</tr>"""
+</tr>
+<tr><td style="height:1px;background:#E5E7EB;font-size:1px">&nbsp;</td></tr>"""
 
 
 def _build_related_sources(article: dict) -> str:
@@ -112,28 +194,28 @@ def _build_related_sources(article: dict) -> str:
         if src:
             links.append(src)
     if links:
-        return f'<br><span style="font-size:10px;color:#B0B8C4;font-family:{FONT_STACK}">관련: {", ".join(links)}</span>'
+        return f'<br><span style="font-size:10px;color:#B0B8C4">관련: {", ".join(links)}</span>'
     return ""
 
 
 def _build_sector_block(sector: str, articles: list) -> str:
-    """Build a sector section with all its articles — Outlook safe."""
+    """Build a sector section with all its articles."""
     if not articles:
         return ""
 
-    label, color = SECTOR_ICONS.get(sector, ("기타", "#6B7280"))
+    icon, color, eng_name = SECTOR_ICONS.get(sector, ("📰", "#6B7280", "Other"))
 
     article_rows = ""
     for i, a in enumerate(articles[:5]):
         article_rows += _build_article_card(a, i)
 
     return f"""<tr>
-<td style="padding:0 32px 24px 32px;font-family:{FONT_STACK}">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #D1D5DB">
+<td style="padding:0 32px 24px 32px">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #E5E7EB;border-radius:8px;overflow:hidden">
   <tr>
-    <td style="background-color:{NAVY};padding:12px 20px;border-bottom:1px solid #D1D5DB;font-family:{FONT_STACK}">
-      <span style="color:#ffffff;font-size:14px;font-weight:bold;font-family:{FONT_STACK}">[{label}]</span>
-      <span style="color:rgba(255,255,255,0.6);font-size:11px;float:right;padding-top:2px;font-family:{FONT_STACK}">{len(articles)}건</span>
+    <td style="background-color:{NAVY};padding:12px 20px">
+      <span style="color:#ffffff;font-size:14px;font-weight:700;letter-spacing:0.3px">{icon} {sector}</span>
+      <span style="color:rgba(255,255,255,0.6);font-size:11px;float:right;padding-top:2px">{len(articles)}건</span>
     </td>
   </tr>
   {article_rows}
@@ -142,8 +224,34 @@ def _build_sector_block(sector: str, articles: list) -> str:
 </tr>"""
 
 
+def _build_kpi_bar(articles: list, sectors: dict) -> str:
+    """Build KPI dashboard bar with key metrics."""
+    total = len(articles)
+    avg_score = sum(a.get("score", 0) for a in articles) / max(total, 1)
+    top_sector = max(sectors.items(), key=lambda x: len(x[1]))[0] if sectors else "N/A"
+    high_priority = sum(1 for a in articles if a.get("score", 0) >= 4)
+
+    sector_icon = SECTOR_ICONS.get(top_sector, ("📰", "#6B7280", ""))[0]
+
+    cells = [
+        (f"{total}", "분석 기사", "#2563EB"),
+        (f"{avg_score:.1f}", "평균 중요도", "#D97706"),
+        (f"{high_priority}", "긴급 뉴스", "#DC2626"),
+        (f"{sector_icon} {top_sector}", "핵심 섹터", "#059669"),
+    ]
+
+    html = ""
+    for value, label, color in cells:
+        html += f"""<td width="25%" align="center" style="padding:16px 8px;border-right:1px solid #E2E8F0">
+  <span style="display:block;font-size:20px;font-weight:800;color:{color}">{value}</span>
+  <span style="display:block;font-size:11px;color:#64748B;margin-top:2px">{label}</span>
+</td>"""
+
+    return html
+
+
 def build_newsletter_html(country: str, articles: list, days: int, insights: list[str] = None, recommendations: list[str] = None) -> str:
-    """Build a complete professional newsletter HTML — Outlook compatible."""
+    """Build a complete professional newsletter HTML."""
     name = COUNTRY_NAMES.get(country, country)
     flag = COUNTRY_FLAGS.get(country, "")
     today = datetime.now().strftime("%Y.%m.%d")
@@ -174,12 +282,14 @@ def build_newsletter_html(country: str, articles: list, days: int, insights: lis
                 insights.append(summary[:120])
 
     insights_html = ""
-    for i, ins in enumerate(insights[:5], 1):
-        insights_html += f"""<tr><td style="padding:6px 0;font-family:{FONT_STACK}">
+    insight_icons = ["🔥", "📈", "⚡", "🎯", "🔍"]
+    for i, ins in enumerate(insights[:5]):
+        icon = insight_icons[i] if i < len(insight_icons) else "▶"
+        insights_html += f"""<tr><td style="padding:8px 0">
   <table width="100%" cellpadding="0" cellspacing="0" border="0">
   <tr>
-    <td width="24" valign="top" style="font-size:13px;color:{NAVY};font-weight:bold;font-family:{FONT_STACK}">{i}.</td>
-    <td style="padding-left:4px;font-size:13px;color:#374151;line-height:1.65;font-family:{FONT_STACK}">{_esc(ins)}</td>
+    <td width="30" valign="top" style="padding-top:2px"><span style="font-size:16px">{icon}</span></td>
+    <td style="padding-left:8px;font-size:14px;color:#374151;line-height:1.65">{_esc(ins)}</td>
   </tr>
   </table>
 </td></tr>"""
@@ -187,20 +297,21 @@ def build_newsletter_html(country: str, articles: list, days: int, insights: lis
     # Build recommendations
     if not recommendations:
         recommendations = [
-            "경쟁사 동향 분석을 바탕으로 대응 전략 수립 검토 필요",
-            "시장 규제 변화에 선제적으로 대응하여 인증 선점 기회 모색",
-            "전방산업 수요 변화를 반영한 제품 포트폴리오 최적화",
+            f"경쟁사 동향 분석을 바탕으로 대응 전략 수립 검토 필요",
+            f"시장 규제 변화에 선제적으로 대응하여 인증 선점 기회 모색",
+            f"전방산업 수요 변화를 반영한 제품 포트폴리오 최적화",
         ]
 
-    priority_labels = ["최우선", "중요", "주목", "참고", "모니터링"]
+    # Priority labels for recommendations
+    priority_labels = ["🔴 최우선", "🟠 중요", "🟡 주목", "🔵 참고", "⚪ 모니터링"]
 
     recs_html = ""
-    for i, rec in enumerate(recommendations[:5]):
+    for i, rec in enumerate(recommendations[:5], 0):
         prio = priority_labels[i] if i < len(priority_labels) else ""
-        recs_html += f"""<tr><td style="padding:10px 0;font-size:13px;color:#374151;line-height:1.6;border-bottom:1px solid #E5E7EB;font-family:{FONT_STACK}">
+        recs_html += f"""<tr><td style="padding:12px 0;font-size:14px;color:#374151;line-height:1.6;border-bottom:1px solid #E8ECF4">
   <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-    <td width="24" valign="top" style="font-size:13px;font-weight:bold;color:{NAVY};font-family:{FONT_STACK}">{i+1}.</td>
-    <td style="padding-left:4px;font-family:{FONT_STACK}"><span style="font-size:11px;color:#6B7280;font-family:{FONT_STACK}">[{prio}]</span> <span style="font-weight:bold;font-family:{FONT_STACK}">{_esc(rec)}</span></td>
+    <td width="28" valign="top"><span style="display:inline-block;background:{NAVY};color:#fff;width:24px;height:24px;border-radius:50%;text-align:center;line-height:24px;font-size:12px;font-weight:700">{i+1}</span></td>
+    <td style="padding-left:10px"><span style="font-size:11px;color:#6B7280">{prio}</span><br><span style="font-weight:600">{_esc(rec)}</span></td>
   </tr></table>
 </td></tr>"""
 
@@ -211,48 +322,56 @@ def build_newsletter_html(country: str, articles: list, days: int, insights: lis
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SK엔무브 글로벌 MI 뉴스레터 — {name}</title>
-<!--[if mso]>
-<style type="text/css">
-table {{border-collapse:collapse;}}
-td {{font-family:'Malgun Gothic','맑은 고딕',Arial,sans-serif;}}
-</style>
-<![endif]-->
 </head>
-<body style="margin:0;padding:0;font-family:{FONT_STACK};line-height:1.6;color:#333333;-webkit-text-size-adjust:100%">
+<body style="margin:0;padding:0;background-color:#f4f4f4;font-family:{FONT_STACK};line-height:1.6;color:#333333;-webkit-text-size-adjust:100%">
 
-<table width="100%" cellpadding="0" cellspacing="0" border="0">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f4f4">
 <tr><td align="center" style="padding:24px 12px">
 
-<table width="680" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #D1D5DB">
+<table width="680" cellpadding="0" cellspacing="0" border="0" style="background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08)">
 
-<!-- HEADER -->
+<!-- ═══ HEADER ═══ -->
 <tr>
-<td style="padding:32px 40px;text-align:center;border-bottom:2px solid {BRAND_RED};font-family:{FONT_STACK}">
+<td style="background-color:{NAVY};padding:36px 40px;text-align:center">
   <table width="100%" cellpadding="0" cellspacing="0" border="0">
-  <tr><td align="center" style="font-family:{FONT_STACK}">
-    <span style="color:{BRAND_RED};font-weight:bold;font-size:14px;letter-spacing:1.5px;font-family:{FONT_STACK}">SK enmove</span>
+  <tr><td align="center">
+    <table cellpadding="0" cellspacing="0" border="0">
+    <tr>
+      <td style="background-color:{BRAND_RED};color:#ffffff;font-weight:800;font-size:14px;padding:6px 16px;border-radius:6px;letter-spacing:1.5px">SK enmove</td>
+    </tr>
+    </table>
   </td></tr>
-  <tr><td align="center" style="padding-top:16px;font-family:{FONT_STACK}">
-    <span style="color:{NAVY};font-size:24px;font-weight:bold;font-family:{FONT_STACK}">{flag} {name} 윤활유 시장 인텔리전스</span>
+  <tr><td align="center" style="padding-top:20px">
+    <span style="color:#ffffff;font-size:26px;font-weight:800;letter-spacing:-0.5px;line-height:1.3">{flag} {name} 윤활유 시장 인텔리전스</span>
   </td></tr>
-  <tr><td align="center" style="padding-top:8px;font-family:{FONT_STACK}">
-    <span style="color:#6B7280;font-size:12px;font-family:{FONT_STACK}">{today} | 최근 {days}일 동향 분석 | {total_articles}건 분석 · {total_sources}개 소스</span>
+  <tr><td align="center" style="padding-top:10px">
+    <span style="color:#8BA4C4;font-size:13px">{today} | 최근 {days}일 동향 분석 | {total_articles}건 분석 · {total_sources}개 소스</span>
   </td></tr>
   </table>
 </td>
 </tr>
 
-<!-- EXECUTIVE SUMMARY -->
+<!-- ═══ KPI DASHBOARD ═══ -->
 <tr>
-<td style="padding:28px 32px 20px 32px;font-family:{FONT_STACK}">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-left:4px solid {BRAND_RED}">
-  <tr><td style="padding:16px 20px;font-family:{FONT_STACK}">
+<td style="padding:0">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F1F5F9">
+  <tr>
+    {_build_kpi_bar(articles, sectors)}
+  </tr>
+  </table>
+</td>
+</tr>
+
+<!-- ═══ EXECUTIVE SUMMARY ═══ -->
+<tr>
+<td style="padding:32px 32px 24px 32px">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#FFFBF0;border-left:4px solid {BRAND_RED};border-radius:0 8px 8px 0">
+  <tr><td style="padding:20px 24px">
     <table width="100%" cellpadding="0" cellspacing="0" border="0">
-    <tr><td style="padding-bottom:12px;font-family:{FONT_STACK}">
-      <span style="font-size:17px;font-weight:bold;color:{NAVY};font-family:{FONT_STACK}">핵심 인사이트</span>
+    <tr><td style="padding-bottom:14px">
+      <span style="font-size:18px;font-weight:800;color:{NAVY}">📋 핵심 인사이트</span>
     </td></tr>
     {insights_html}
     </table>
@@ -261,30 +380,30 @@ td {{font-family:'Malgun Gothic','맑은 고딕',Arial,sans-serif;}}
 </td>
 </tr>
 
-<!-- SECTION DIVIDER -->
+<!-- ═══ SECTION DIVIDER ═══ -->
 <tr>
-<td style="padding:8px 32px 20px 32px;font-family:{FONT_STACK}">
+<td style="padding:8px 32px 20px 32px">
   <table width="100%" cellpadding="0" cellspacing="0" border="0">
   <tr>
-    <td style="border-bottom:2px solid {NAVY};padding-bottom:8px;font-family:{FONT_STACK}">
-      <span style="font-size:17px;font-weight:bold;color:{NAVY};font-family:{FONT_STACK}">섹터별 주요 뉴스</span>
+    <td style="border-bottom:2px solid {NAVY};padding-bottom:8px">
+      <span style="font-size:18px;font-weight:800;color:{NAVY}">📰 섹터별 주요 뉴스</span>
     </td>
   </tr>
   </table>
 </td>
 </tr>
 
-<!-- SECTOR BLOCKS -->
+<!-- ═══ SECTOR BLOCKS ═══ -->
 {sector_html}
 
-<!-- STRATEGIC RECOMMENDATIONS -->
+<!-- ═══ STRATEGIC RECOMMENDATIONS ═══ -->
 <tr>
-<td style="padding:8px 32px 28px 32px;font-family:{FONT_STACK}">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-left:4px solid {NAVY}">
-  <tr><td style="padding:16px 20px;font-family:{FONT_STACK}">
+<td style="padding:8px 32px 32px 32px">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F0F4FF;border-left:4px solid {NAVY};border-radius:0 8px 8px 0">
+  <tr><td style="padding:20px 24px">
     <table width="100%" cellpadding="0" cellspacing="0" border="0">
-    <tr><td style="padding-bottom:12px;font-family:{FONT_STACK}">
-      <span style="font-size:17px;font-weight:bold;color:{NAVY};font-family:{FONT_STACK}">마케팅 전략 제언</span>
+    <tr><td style="padding-bottom:14px">
+      <span style="font-size:18px;font-weight:800;color:{NAVY}">💡 마케팅 전략 제언</span>
     </td></tr>
     {recs_html}
     </table>
@@ -293,15 +412,15 @@ td {{font-family:'Malgun Gothic','맑은 고딕',Arial,sans-serif;}}
 </td>
 </tr>
 
-<!-- FOOTER -->
+<!-- ═══ FOOTER ═══ -->
 <tr>
-<td style="padding:20px 40px;text-align:center;border-top:1px solid #D1D5DB;font-family:{FONT_STACK}">
+<td style="background-color:#F8FAFC;padding:24px 40px;text-align:center;border-top:1px solid #E5E7EB">
   <table width="100%" cellpadding="0" cellspacing="0" border="0">
-  <tr><td align="center" style="font-family:{FONT_STACK}">
-    <span style="color:#6B7280;font-size:11px;line-height:2;font-family:{FONT_STACK}">
+  <tr><td align="center">
+    <span style="color:#6B7280;font-size:12px;line-height:2">
       SK Enmove Global MI Newsletter<br>
       본 뉴스레터는 공개 소스 기반 자동 수집·분석 결과이며, 투자 조언이 아닙니다.<br>
-      <span style="color:#9CA3AF;font-family:{FONT_STACK}">Powered by LangGraph + Claude AI</span>
+      <span style="color:#9CA3AF">Powered by LangGraph + Claude AI | Newsletter SaaS v1.0</span>
     </span>
   </td></tr>
   </table>
@@ -337,6 +456,8 @@ async def write_newsletter(state: NewsletterState) -> dict:
         if len(articles) < 2:
             logger.warning(f"[{country}] Only {len(articles)} articles, using minimal template")
 
+        # Always use the structured template for consistent quality
+        # LLM generates insights and recommendations, template handles layout
         insights = []
         recommendations = []
 
@@ -355,8 +476,8 @@ async def write_newsletter(state: NewsletterState) -> dict:
                     feedback_text = f"\nPrevious issues: {', '.join(fb.get('issues', []))}"
 
                 prompt = f"""Based on these {COUNTRY_NAMES.get(country, country)} lubricant market articles, generate:
-1. Exactly 5 Korean executive insights — each MUST be 1 sentence only (max 80 characters). Data-driven, about lubricant sales impact. No filler.
-2. Exactly 4 Korean strategic recommendations — each 1 sentence, specific and actionable for SK Enmove sales team.
+1. Exactly 5 Korean executive insights (핵심 인사이트) — each 1-2 sentences, data-driven, about lubricant sales impact
+2. Exactly 4 Korean strategic recommendations (전략 제언) — each specific and actionable for SK Enmove sales team
 {feedback_text}
 
 Articles: {articles_summary}
