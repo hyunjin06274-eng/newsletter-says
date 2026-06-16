@@ -166,16 +166,24 @@ async def get_settings():
     if rows:
         c = rows[0]
         recipients = c.get("country_recipients", []) or []
+        parsed_recipients = []
+        for r in recipients:
+            if not isinstance(r, dict):
+                continue
+            parsed_recipients.append({
+                "country": r["country"],
+                "to": r.get("to", r.get("recipients", [])),  # backward compat
+                "cc": r.get("cc", []),
+            })
         schedule = ScheduleSettings(
             frequency=c.get("frequency", "weekly"),
             day_of_week=c.get("day_of_week", "Tuesday"),
             time=c.get("time", "09:00"),
-            countries=c.get("countries", ["KR", "RU", "VN", "TH", "PH", "PK"]),
+            countries=c.get("countries", ["KR", "RU", "VN", "TH", "PH", "PK", "GCC", "CN", "US", "IN", "JP"]),
             is_active=c.get("is_active", True),
-            country_recipients=[
-                {"country": r["country"], "recipients": r["recipients"]}
-                for r in recipients if isinstance(r, dict)
-            ],
+            country_recipients=parsed_recipients,
+            min_total_score=c.get("min_total_score", 10),
+            min_country_score=c.get("min_country_score", 3),
         )
 
     return SettingsResponse(
@@ -193,7 +201,7 @@ async def get_settings():
 async def update_settings(body: ScheduleSettings):
     db = get_supabase()
     recipients_list = [
-        {"country": cr.country, "recipients": cr.recipients}
+        {"country": cr.country, "to": cr.to, "cc": cr.cc}
         for cr in body.country_recipients
     ] if body.country_recipients else []
 
@@ -204,6 +212,8 @@ async def update_settings(body: ScheduleSettings):
         "countries": body.countries,
         "is_active": body.is_active,
         "country_recipients": recipients_list,
+        "min_total_score": body.min_total_score,
+        "min_country_score": body.min_country_score,
         "updated_at": datetime.utcnow().isoformat(),
     })
     return {"status": "ok", "message": "Settings saved"}

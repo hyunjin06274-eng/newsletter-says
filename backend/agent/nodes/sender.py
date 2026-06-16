@@ -16,6 +16,8 @@ logger = logging.getLogger(__name__)
 COUNTRY_NAMES = {
     "KR": "한국", "RU": "러시아", "VN": "베트남",
     "TH": "태국", "PH": "필리핀", "PK": "파키스탄",
+    "GCC": "GCC(걸프협력회의)",
+    "CN": "중국", "US": "미국", "IN": "인도", "JP": "일본",
 }
 
 
@@ -85,11 +87,13 @@ def get_gmail_service():
     return build("gmail", "v1", credentials=creds)
 
 
-def create_email(sender: str, to: list[str], subject: str, html_body: str) -> dict:
-    """Create a Gmail-compatible email message."""
+def create_email(sender: str, to: list[str], subject: str, html_body: str, cc: list[str] | None = None) -> dict:
+    """Create a Gmail-compatible email message with optional CC."""
     msg = MIMEMultipart("alternative")
     msg["From"] = sender
     msg["To"] = ", ".join(to)
+    if cc:
+        msg["Cc"] = ", ".join(cc)
     msg["Subject"] = subject
     msg.attach(MIMEText(html_body, "html", "utf-8"))
 
@@ -106,9 +110,11 @@ async def send_newsletter(state: NewsletterState) -> dict:
     sender = os.environ.get("GMAIL_SENDER", "skenbizst@gmail.com")
     send_results: dict[str, bool] = {}
 
-    # Load recipients from Supabase Settings
-    global_recipients = []
-    country_extra: dict[str, list[str]] = {}
+    # Load recipients from Supabase Settings (to/cc per country)
+    global_to: list[str] = []
+    global_cc: list[str] = []
+    country_to: dict[str, list[str]] = {}
+    country_cc: dict[str, list[str]] = {}
     try:
         import requests as _req
         supabase_url = os.environ.get("SUPABASE_URL", "")
@@ -121,19 +127,24 @@ async def send_newsletter(state: NewsletterState) -> dict:
             )
             if resp.ok and resp.json():
                 for cr in resp.json()[0].get("country_recipients", []):
+                    # Support both new {to, cc} format and legacy {recipients} format
+                    to_list = cr.get("to", cr.get("recipients", []))
+                    cc_list = cr.get("cc", [])
                     if cr.get("country") == "ALL":
-                        global_recipients = cr.get("recipients", [])
+                        global_to = to_list
+                        global_cc = cc_list
                     else:
-                        country_extra[cr["country"]] = cr.get("recipients", [])
-                logger.info(f"Loaded recipients: global={global_recipients}, extras={list(country_extra.keys())}")
-                print(f"Loaded recipients: global={global_recipients}, extras={list(country_extra.keys())}", flush=True)
+                        country_to[cr["country"]] = to_list
+                        country_cc[cr["country"]] = cc_list
+                logger.info(f"Loaded recipients: global_to={global_to}, global_cc={global_cc}")
+                print(f"Loaded recipients: global_to={global_to}, global_cc={global_cc}", flush=True)
     except Exception as e:
         logger.warning(f"Failed to load recipients from Supabase: {e}")
 
-    # Fallback to env
-    if not global_recipients:
+    # Fallback to env (TO only)
+    if not global_to:
         env_recip = os.environ.get("DEFAULT_RECIPIENTS", "").split(",")
-        global_recipients = [r.strip() for r in env_recip if r.strip()]
+        global_to = [r.strip() for r in env_recip if r.strip()]
 
     try:
         service = await asyncio.to_thread(get_gmail_service)
@@ -150,26 +161,26 @@ async def send_newsletter(state: NewsletterState) -> dict:
         country_name = COUNTRY_NAMES.get(country, country)
         subject = f"{country_name} 윤활유 시장 뉴스레터 ({date_str[:4]}.{date_str[4:6]}.{date_str[6:]})"
 
-        # Merge global + country-specific recipients
-        recipients = list(global_recipients)
-        if country in country_extra:
-            recipients.extend(country_extra[country])
-        # Dedupe
-        recipients = list(dict.fromkeys(r for r in recipients if r))
+        # Merge global + country-specific TO/CC
+        to_list = list(global_to) + list(country_to.get(country, []))
+        cc_list = list(global_cc) + list(country_cc.get(country, []))
+        # Dedupe while preserving order
+        to_list = list(dict.fromkeys(r for r in to_list if r))
+        cc_list = list(dict.fromkeys(r for r in cc_list if r and r not in to_list))
 
-        if not recipients:
-            logger.warning(f"[{country}] No recipients configured, skipping")
+        if not to_list:
+            logger.warning(f"[{country}] No TO recipients configured, skipping")
             send_results[country] = False
             continue
 
         try:
-            message = create_email(sender, recipients, subject, html)
+            message = create_email(sender, to_list, subject, html, cc=cc_list or None)
             await asyncio.to_thread(
                 service.users().messages().send(userId="me", body=message).execute
             )
             send_results[country] = True
-            logger.info(f"[{country}] Email sent to {recipients}")
-            print(f"[{country}] Email sent to {recipients}", flush=True)
+            logger.info(f"[{country}] Email sent to={to_list} cc={cc_list}")
+            print(f"[{country}] Email sent to={to_list} cc={cc_list}", flush=True)
         except Exception as e:
             logger.error(f"[{country}] Send failed: {e}")
             send_results[country] = False

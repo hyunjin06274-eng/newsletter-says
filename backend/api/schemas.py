@@ -9,7 +9,7 @@ from pydantic import BaseModel, EmailStr
 
 
 class RunCreate(BaseModel):
-    countries: list[str] = ["KR", "RU", "VN", "TH", "PH", "PK"]
+    countries: list[str] = ["KR", "RU", "VN", "TH", "PH", "PK", "GCC", "CN", "US", "IN", "JP"]
     date_str: Optional[str] = None  # YYYYMMDD, defaults to today
     days: int = 30
     dry_run: bool = False
@@ -49,16 +49,19 @@ class RunListResponse(BaseModel):
 
 class CountryRecipients(BaseModel):
     country: str
-    recipients: list[str]
+    to: list[str] = []
+    cc: list[str] = []
 
 
 class ScheduleSettings(BaseModel):
     frequency: str = "weekly"  # weekly, daily, monthly
     day_of_week: str = "Wednesday"
     time: str = "10:00"
-    countries: list[str] = ["KR", "RU", "VN", "TH", "PH", "PK"]
+    countries: list[str] = ["KR", "RU", "VN", "TH", "PH", "PK", "GCC", "CN", "US", "IN", "JP"]
     is_active: bool = True
     country_recipients: list[CountryRecipients] = []
+    min_total_score: int = 10   # LLM total score threshold (0-30)
+    min_country_score: int = 3  # LLM country specificity threshold (0-10)
 
 
 class SettingsResponse(BaseModel):

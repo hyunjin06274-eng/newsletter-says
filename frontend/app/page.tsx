@@ -10,11 +10,17 @@ const COUNTRY_FLAGS: Record<string, string> = {
   TH: "\uD83C\uDDF9\uD83C\uDDED",
   PH: "\uD83C\uDDF5\uD83C\uDDED",
   PK: "\uD83C\uDDF5\uD83C\uDDF0",
+  GCC: "\uD83C\uDDF8\uD83C\uDDE6",
+  CN: "\uD83C\uDDE8\uD83C\uDDF3",
+  US: "\uD83C\uDDFA\uD83C\uDDF8",
+  IN: "\uD83C\uDDEE\uD83C\uDDF3",
+  JP: "\uD83C\uDDEF\uD83C\uDDF5",
 };
 
 const COUNTRY_NAMES: Record<string, string> = {
   KR: "Korea", RU: "Russia", VN: "Vietnam",
   TH: "Thailand", PH: "Philippines", PK: "Pakistan",
+  GCC: "GCC", CN: "China", US: "USA", IN: "India", JP: "Japan",
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -206,7 +212,7 @@ export default function Dashboard() {
         {/* One-time Send */}
         <button
           onClick={() => {
-            if (confirm("6개국 뉴스레터를 즉시 생성하고 이메일 발송하시겠습니까?")) {
+            if (confirm("11개국 뉴스레터를 즉시 생성하고 이메일 발송하시겠습니까?")) {
               handleStartRun();
             }
           }}
@@ -286,7 +292,7 @@ export default function Dashboard() {
             Edit in Settings &rarr;
           </a>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
           {Object.entries(COUNTRY_FLAGS).map(([code, flag]) => (
             <div
               key={code}
