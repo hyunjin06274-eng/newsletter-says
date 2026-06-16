@@ -63,6 +63,7 @@ export default function SettingsPage() {
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   const STORAGE_KEY = "newsletter-saas-settings";
 
@@ -148,6 +149,7 @@ export default function SettingsPage() {
 
   async function saveSettings() {
     setSaving(true);
+    setSaveError("");
     try {
       const countryRecipients: CountryRecipients[] = [];
 
@@ -197,16 +199,18 @@ export default function SettingsPage() {
         if (res.ok) {
           setSaved(true);
           setSaving(false);
-          setTimeout(() => setSaved(false), 2000);
+          setTimeout(() => setSaved(false), 3000);
           return;
+        } else {
+          const errText = await res.text().catch(() => "");
+          setSaveError(`Server error ${res.status}: ${errText.slice(0, 100)}`);
         }
-      } catch {
-        // API failed — but localStorage saved
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setSaveError(msg.includes("abort") ? "Request timed out — backend may be sleeping. Try again." : `Network error: ${msg}`);
       }
 
-      setSaved(true);
       setSaving(false);
-      setTimeout(() => setSaved(false), 2000);
     } catch (e) {
       console.error("Save failed:", e);
       setSaving(false);
@@ -226,13 +230,20 @@ export default function SettingsPage() {
           <h1 className="text-3xl font-bold">Settings</h1>
           <p className="text-gray-400 mt-1">Configure schedule, countries, recipients, and scoring</p>
         </div>
-        <button
-          onClick={saveSettings}
-          disabled={saving}
-          className="px-6 py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-700 text-white rounded-lg font-medium transition-colors"
-        >
-          {saving ? "Saving..." : saved ? "Saved!" : "Save Settings"}
-        </button>
+        <div className="flex flex-col items-end gap-2">
+          <button
+            onClick={saveSettings}
+            disabled={saving}
+            className={`px-6 py-3 rounded-lg font-medium transition-colors text-white ${
+              saved ? "bg-green-600" : saving ? "bg-gray-700" : "bg-red-600 hover:bg-red-700"
+            }`}
+          >
+            {saving ? "Saving..." : saved ? "✓ Saved to server" : "Save Settings"}
+          </button>
+          {saveError && (
+            <p className="text-xs text-red-400 max-w-xs text-right">{saveError}</p>
+          )}
+        </div>
       </div>
 
       {/* Schedule */}

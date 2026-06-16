@@ -109,10 +109,10 @@ async def send_newsletter(state: NewsletterState) -> dict:
     sender = os.environ.get("GMAIL_SENDER", "skenbizst@gmail.com")
     send_results: dict[str, bool] = {}
 
-    # Load recipients — priority:
-    # 1. recipients table (flat TO-only, existing table)
-    # 2. settings.country_recipients (TO/CC split, with legacy {recipients} fallback)
-    # 3. DEFAULT_RECIPIENTS env var (TO-only)
+    # Load recipients — sources are MERGED (not mutually exclusive):
+    # 1. settings.country_recipients (primary: TO/CC per country, set via UI)
+    # 2. recipients table (legacy: additional global TO, always included)
+    # 3. DEFAULT_RECIPIENTS env var (fallback if both above are empty)
     global_to: list[str] = []
     global_cc: list[str] = []
     country_to: dict[str, list[str]] = {}
@@ -125,7 +125,30 @@ async def send_newsletter(state: NewsletterState) -> dict:
         import requests as _req
         headers = {"apikey": supabase_key, "Authorization": f"Bearer {supabase_key}"}
 
-        # 1순위: recipients 테이블 (TO only)
+        # 1순위: settings.country_recipients — UI에서 설정한 TO/CC (주 소스)
+        try:
+            resp = _req.get(
+                f"{supabase_url}/rest/v1/settings?order=id.desc&limit=1&select=country_recipients",
+                headers=headers,
+                timeout=10,
+            )
+            if resp.ok and resp.json():
+                for cr in resp.json()[0].get("country_recipients", []):
+                    # 신규 {to, cc} 포맷 + 구 {recipients} 포맷 호환
+                    to_list = cr.get("to", cr.get("recipients", []))
+                    cc_list = cr.get("cc", [])
+                    if cr.get("country") == "ALL":
+                        global_to = list(to_list)
+                        global_cc = list(cc_list)
+                    else:
+                        country_to[cr["country"]] = list(to_list)
+                        country_cc[cr["country"]] = list(cc_list)
+                logger.info(f"[settings] global_to={global_to}, global_cc={global_cc}, countries={list(country_to.keys())}")
+                print(f"[settings] global_to={global_to}, global_cc={global_cc}, countries={list(country_to.keys())}", flush=True)
+        except Exception as e:
+            logger.warning(f"Failed to load from settings: {e}")
+
+        # 2순위: recipients 테이블 — global_to에 병합 (기존 데이터 보존)
         try:
             resp = _req.get(
                 f"{supabase_url}/rest/v1/recipients?is_active=eq.true&select=email,country",
@@ -149,39 +172,18 @@ async def send_newsletter(state: NewsletterState) -> dict:
                         if not email or "@" not in email:
                             continue
                         if c == "ALL":
-                            global_to.append(email)
+                            if email not in global_to:
+                                global_to.append(email)
                         else:
-                            country_to.setdefault(c, []).append(email)
-                logger.info(f"[recipients table] global_to={global_to}, extras={dict(country_to)}")
-                print(f"[recipients table] global_to={global_to}, extras={dict(country_to)}", flush=True)
+                            lst = country_to.setdefault(c, [])
+                            if email not in lst:
+                                lst.append(email)
+                logger.info(f"[recipients table merged] global_to={global_to}, extras={list(country_to.keys())}")
+                print(f"[recipients table merged] global_to={global_to}, extras={list(country_to.keys())}", flush=True)
         except Exception as e:
             logger.warning(f"Failed to load from recipients table: {e}")
 
-        # 2순위: settings.country_recipients — TO/CC 지원 (recipients 테이블 없을 때)
-        if not global_to and not country_to:
-            try:
-                resp = _req.get(
-                    f"{supabase_url}/rest/v1/settings?order=id.desc&limit=1&select=country_recipients",
-                    headers=headers,
-                    timeout=10,
-                )
-                if resp.ok and resp.json():
-                    for cr in resp.json()[0].get("country_recipients", []):
-                        # 신규 {to, cc} 포맷 + 구 {recipients} 포맷 호환
-                        to_list = cr.get("to", cr.get("recipients", []))
-                        cc_list = cr.get("cc", [])
-                        if cr.get("country") == "ALL":
-                            global_to = to_list
-                            global_cc = cc_list
-                        else:
-                            country_to[cr["country"]] = to_list
-                            country_cc[cr["country"]] = cc_list
-                    logger.info(f"[settings] global_to={global_to}, global_cc={global_cc}")
-                    print(f"[settings] global_to={global_to}, global_cc={global_cc}", flush=True)
-            except Exception as e:
-                logger.warning(f"Failed to load from settings: {e}")
-
-    # 3순위: DEFAULT_RECIPIENTS 환경변수 (TO only)
+    # 3순위: DEFAULT_RECIPIENTS 환경변수 (두 소스 모두 비어있을 때만)
     if not global_to and not country_to:
         env_recip = os.environ.get("DEFAULT_RECIPIENTS", "").split(",")
         global_to = [r.strip() for r in env_recip if r.strip()]
