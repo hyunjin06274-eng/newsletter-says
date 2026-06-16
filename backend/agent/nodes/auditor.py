@@ -10,28 +10,24 @@ from backend.agent.state import NewsletterState, AuditFeedback
 logger = logging.getLogger(__name__)
 
 AUDIT_PROMPT = """You are a quality auditor for SK Enmove's MI newsletter.
-Evaluate this newsletter HTML for quality. Score 1-5 on each criterion.
+Evaluate this newsletter HTML for quality. Score each criterion 1-5.
 
 Newsletter HTML (truncated to 3000 chars):
 {html_preview}
 
 Criteria:
-1. Information Accuracy: Are facts/numbers plausible? No hallucinated data?
-2. Korean Quality: Natural Korean, no awkward machine translation?
-3. Tone & Style: Professional, suitable for marketing/sales strategists?
-4. Completeness: Has all 3 sections (핵심 인사이트, 섹터별 뉴스, 전략 제언)?
-5. Actionability: Are strategy recommendations specific and actionable?
-6. No CSR/ESG fluff: Avoids generic sustainability filler?
-7. Factual Fidelity: Does the newsletter accurately reflect the original articles' geopolitical and factual context without substitution or reinterpretation? (e.g., NOT replacing one conflict with another)
+1. accuracy: Are facts/numbers plausible? No hallucinated data?
+2. korean: Natural Korean, no awkward machine translation?
+3. tone: Professional, suitable for marketing/sales strategists?
+4. completeness: Has all 3 sections (핵심 인사이트, 섹터별 뉴스, 전략 제언)?
+5. actionability: Are strategy recommendations specific and actionable?
+6. no_fluff: Avoids generic CSR/ESG sustainability filler?
+7. factual_fidelity: Accurately reflects original articles without substituting or reinterpreting geopolitical facts?
 
-Respond in JSON:
-{{
-  "passed": true/false (true if avg score >= 3.5),
-  "score": 0.0-5.0 (average),
-  "scores": {{"accuracy": N, "korean": N, "tone": N, "completeness": N, "actionability": N, "no_fluff": N, "factual_fidelity": N}},
-  "issues": ["issue1", "issue2"],
-  "suggestions": ["suggestion1", "suggestion2"]
-}}
+Respond ONLY with valid JSON (no markdown, no extra text):
+{{"passed": true, "score": 4.2, "scores": {{"accuracy": 4, "korean": 4, "tone": 5, "completeness": 4, "actionability": 4, "no_fluff": 4, "factual_fidelity": 5}}, "issues": [], "suggestions": []}}
+
+Set "passed" to true if average score >= 3.5, false otherwise.
 """
 
 
@@ -62,6 +58,12 @@ async def audit_newsletter(state: NewsletterState) -> dict:
                     messages=[{"role": "user", "content": prompt}],
                 )
                 text = response.content[0].text.strip()
+                # Strip markdown code fences if present
+                if "```" in text:
+                    text = text[text.find("```") + 3:]
+                    if text.startswith("json"):
+                        text = text[4:]
+                    text = text[:text.rfind("```")].strip()
                 start, end = text.find("{"), text.rfind("}")
                 if start != -1 and end != -1 and end > start:
                     data = json.loads(text[start:end + 1])
