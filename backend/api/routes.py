@@ -242,3 +242,29 @@ async def get_run_logs(run_id: str):
     db = get_supabase()
     rows = db.select("run_logs", {"run_id": f"eq.{run_id}", "order": "created_at.asc"})
     return {"logs": rows}
+
+
+@router.get("/recipients")
+async def get_recipients():
+    """Return recipients table rows merged into country_recipients format."""
+    import json as _json
+    db = get_supabase()
+    rows = db.select("recipients", {"is_active": "eq.true", "select": "email,country"})
+    # Group by country
+    by_country: dict[str, list[str]] = {}
+    for row in (rows or []):
+        raw = row.get("email", "")
+        country = row.get("country", "ALL")
+        if isinstance(raw, str) and raw.startswith("["):
+            try:
+                emails = _json.loads(raw)
+            except Exception:
+                emails = [raw]
+        else:
+            emails = [raw]
+        for email in emails:
+            email = str(email).strip()
+            if email and "@" in email:
+                by_country.setdefault(country, []).append(email)
+    result = [{"country": c, "to": emails, "cc": []} for c, emails in by_country.items()]
+    return {"recipients": result}

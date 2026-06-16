@@ -120,23 +120,62 @@ export default function SettingsPage() {
     if (local) applySettings(local);
 
     try {
-      const res = await apiFetch("/api/settings");
-      if (res.ok) {
-        const data: Settings = await res.json();
-        const apiHasRecipients = (data.schedule.country_recipients || []).length > 0;
-        if (apiHasRecipients) {
-          applySettings(data);
-          saveToLocal(data.schedule);
-        } else if (local) {
-          const localRecipients = local.schedule?.country_recipients || [];
-          if (localRecipients.length > 0) {
-            apiFetch("/api/settings", {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(local.schedule),
-            }).catch(() => {});
+      // Load settings and recipients table in parallel
+      const [settingsRes, recipientsRes] = await Promise.allSettled([
+        apiFetch("/api/settings"),
+        apiFetch("/api/recipients"),
+      ]);
+
+      let settingsData: Settings | null = null;
+      if (settingsRes.status === "fulfilled" && settingsRes.value.ok) {
+        settingsData = await settingsRes.value.json();
+      }
+
+      // Parse recipients table rows (these are always TO)
+      let recipientRows: CountryRecipients[] = [];
+      if (recipientsRes.status === "fulfilled" && recipientsRes.value.ok) {
+        const rData = await recipientsRes.value.json();
+        recipientRows = rData.recipients || [];
+      }
+
+      if (settingsData) {
+        // Merge: settings is primary, recipients table adds to TO if not already set
+        const merged = { ...settingsData };
+        const existingCountries = new Set((merged.schedule.country_recipients || []).map((cr) => cr.country));
+
+        for (const row of recipientRows) {
+          if (!existingCountries.has(row.country)) {
+            // Add recipients table row as TO-only entry
+            merged.schedule.country_recipients = [
+              ...(merged.schedule.country_recipients || []),
+              { country: row.country, to: row.to, cc: [] },
+            ];
+          } else {
+            // Merge TO emails from recipients table into existing entry
+            merged.schedule.country_recipients = (merged.schedule.country_recipients || []).map((cr) => {
+              if (cr.country !== row.country) return cr;
+              const mergedTo = [...new Set([...cr.to, ...row.to])];
+              return { ...cr, to: mergedTo };
+            });
           }
         }
+
+        applySettings(merged);
+        saveToLocal(merged.schedule);
+      } else if (recipientRows.length > 0) {
+        // No settings data but have recipients table — build a minimal settings from it
+        const fakeSchedule = local?.schedule || {
+          frequency: "weekly", day_of_week: "Wednesday", time: "07:00",
+          countries: ["KR","RU","VN","TH","PH","PK","GCC","CN","US","IN","JP"],
+          is_active: true, country_recipients: [], min_total_score: 10, min_country_score: 3,
+        };
+        fakeSchedule.country_recipients = recipientRows;
+        const fakeSettings: Settings = {
+          schedule: fakeSchedule,
+          api_keys_configured: {},
+          gmail_authenticated: false,
+        };
+        applySettings(fakeSettings);
       }
     } catch {
       // API not available — localStorage data already loaded
