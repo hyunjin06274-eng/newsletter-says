@@ -57,3 +57,26 @@ CREATE POLICY "Allow all on run_logs" ON run_logs FOR ALL USING (true) WITH CHEC
 INSERT INTO settings (frequency, day_of_week, time, countries, is_active, days)
 VALUES ('weekly', 'Tuesday', '09:00', '["KR","RU","VN","TH","PH","PK"]', true, 30)
 ON CONFLICT DO NOTHING;
+
+-- 4. Recipients table (명시적 수신자 테이블 — 발송 우선 소스)
+CREATE TABLE IF NOT EXISTS recipients (
+  id SERIAL PRIMARY KEY,
+  email TEXT NOT NULL,
+  name TEXT DEFAULT '',
+  country TEXT DEFAULT 'ALL',  -- 'ALL' = 전국가 수신, 'KR'/'RU' 등 = 해당 국가만
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE recipients ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all on recipients" ON recipients FOR ALL USING (true) WITH CHECK (true);
+
+-- 기본 수신자 (추가 수신자는 아래 패턴으로 INSERT)
+INSERT INTO recipients (email, name, country, is_active) VALUES
+  ('hyunjin0627@sk.com', '현진', 'ALL', true)
+ON CONFLICT DO NOTHING;
+
+-- ※ 나머지 수신자 추가 예시:
+-- INSERT INTO recipients (email, name, country) VALUES
+--   ('user@skenmove.com', '이름', 'ALL'),   -- 전국가 수신
+--   ('user2@skenmove.com', '이름2', 'KR');  -- 한국만 수신
