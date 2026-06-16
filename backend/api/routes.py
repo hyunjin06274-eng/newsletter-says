@@ -205,7 +205,7 @@ async def update_settings(body: ScheduleSettings):
         for cr in body.country_recipients
     ] if body.country_recipients else []
 
-    db.insert("settings", {
+    payload = {
         "frequency": body.frequency,
         "day_of_week": body.day_of_week,
         "time": body.time,
@@ -215,7 +215,25 @@ async def update_settings(body: ScheduleSettings):
         "min_total_score": body.min_total_score,
         "min_country_score": body.min_country_score,
         "updated_at": datetime.utcnow().isoformat(),
-    })
+    }
+
+    # Upsert: update existing row if exists, insert if not
+    existing = db.select("settings", {"order": "id.desc", "limit": "1", "select": "id"}, limit=1)
+    if existing:
+        row_id = existing[0]["id"]
+        result = db.update("settings", payload, {"id": row_id})
+    else:
+        result = db.insert("settings", payload)
+
+    if result is None:
+        # Retry without new columns in case they don't exist in schema
+        payload_fallback = {k: v for k, v in payload.items()
+                            if k not in ("min_total_score", "min_country_score")}
+        if existing:
+            db.update("settings", payload_fallback, {"id": existing[0]["id"]})
+        else:
+            db.insert("settings", payload_fallback)
+
     return {"status": "ok", "message": "Settings saved"}
 
 
