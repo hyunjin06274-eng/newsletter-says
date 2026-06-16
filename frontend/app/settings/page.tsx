@@ -142,22 +142,22 @@ export default function SettingsPage() {
         // Merge: settings is primary, recipients table adds to TO if not already set
         const merged = { ...settingsData };
         const existingCountries = new Set((merged.schedule.country_recipients || []).map((cr) => cr.country));
+        const hasAnySavedRecipients = existingCountries.size > 0;
 
         for (const row of recipientRows) {
-          if (!existingCountries.has(row.country)) {
-            // Add recipients table row as TO-only entry
-            merged.schedule.country_recipients = [
-              ...(merged.schedule.country_recipients || []),
-              { country: row.country, to: row.to, cc: [] },
-            ];
-          } else {
-            // Merge TO emails from recipients table into existing entry
-            merged.schedule.country_recipients = (merged.schedule.country_recipients || []).map((cr) => {
-              if (cr.country !== row.country) return cr;
-              const mergedTo = [...new Set([...cr.to, ...row.to])];
-              return { ...cr, to: mergedTo };
-            });
+          if (existingCountries.has(row.country)) {
+            // Settings already has data for this country → settings is authoritative, skip
+            continue;
           }
+          if (hasAnySavedRecipients && row.country === "ALL") {
+            // User has saved settings with some countries — don't re-inject legacy ALL recipients
+            continue;
+          }
+          // No saved data for this country yet → pre-fill from recipients table (first-time only)
+          merged.schedule.country_recipients = [
+            ...(merged.schedule.country_recipients || []),
+            { country: row.country, to: row.to, cc: [] },
+          ];
         }
 
         applySettings(merged);
