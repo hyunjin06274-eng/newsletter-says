@@ -9,7 +9,7 @@ on:
       countries:
         description: "Comma-separated country codes (e.g., KR,RU,VN)"
         required: false
-        default: "KR,RU,VN,TH,PH,PK"
+        default: "KR,RU,VN,TH,PH,PK,GCC,CN,US,IN,JP"
       dry_run:
         description: "Skip email sending"
         required: false
@@ -30,7 +30,7 @@ env:
 jobs:
   run-newsletter:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
 
     steps:
       - name: Checkout repository
@@ -49,7 +49,7 @@ jobs:
         run: |
           RUN_ID=$(python3 -c "import uuid; print(str(uuid.uuid4()))")
           DATE_STR=$(date +%Y%m%d)
-          COUNTRIES='["KR","RU","VN","TH","PH","PK"]'
+          COUNTRIES='["KR","RU","VN","TH","PH","PK","GCC","CN","US","IN","JP"]'
           echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
           echo "DATE_STR=$DATE_STR" >> $GITHUB_ENV
           curl -s -X POST "${{ secrets.SUPABASE_URL }}/rest/v1/runs" \
@@ -112,7 +112,7 @@ jobs:
           asyncio.run(main())
           "
         env:
-          INPUT_COUNTRIES: ${{ github.event.inputs.countries || 'KR,RU,VN,TH,PH,PK' }}
+          INPUT_COUNTRIES: ${{ github.event.inputs.countries || 'KR,RU,VN,TH,PH,PK,GCC,CN,US,IN,JP' }}
           INPUT_DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
 
       - name: Update Supabase run to "completed"
