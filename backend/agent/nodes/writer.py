@@ -1,4 +1,4 @@
-"""Phase 3: Professional HTML newsletter generation."""
+"""Phase 3: HTML newsletter generation — finalized design (Outlook-safe)."""
 
 import json
 import logging
@@ -10,426 +10,446 @@ from backend.agent.state import NewsletterState
 
 logger = logging.getLogger(__name__)
 
+FONT = "'Malgun Gothic','맑은 고딕',Arial,sans-serif"
+
 COUNTRY_NAMES = {
     "KR": "한국", "RU": "러시아", "VN": "베트남",
     "TH": "태국", "PH": "필리핀", "PK": "파키스탄",
+    "GCC": "GCC(걸프협력회의)",
+    "CN": "중국", "US": "미국", "IN": "인도", "JP": "일본",
 }
-COUNTRY_FLAGS = {
-    "KR": "🇰🇷", "RU": "🇷🇺", "VN": "🇻🇳",
-    "TH": "🇹🇭", "PH": "🇵🇭", "PK": "🇵🇰",
+COUNTRY_EMOJIS = {
+    "KR": "🌏", "RU": "❄️", "VN": "🌴",
+    "TH": "🌺", "PH": "🏝️", "PK": "🌙",
+    "GCC": "🌙", "CN": "🐉", "US": "🗽", "IN": "🕌", "JP": "🗾",
 }
-
-SECTOR_ICONS = {
-    "윤활유동향": ("🛢️", "#D97706", "Lubricant Trends"),
-    "경쟁사활동": ("🏆", "#DC2626", "Competitor Activity"),
-    "전방산업동향": ("🚗", "#2563EB", "Forward Industry"),
-    "윤활유규제": ("⚖️", "#7C3AED", "Regulation"),
+MARKET_LABELS = {
+    "KR": "KOREA MARKET", "RU": "RUSSIA MARKET", "VN": "VIETNAM MARKET",
+    "TH": "THAILAND MARKET", "PH": "PHILIPPINES MARKET", "PK": "PAKISTAN MARKET",
+    "GCC": "GCC MARKET", "CN": "CHINA MARKET", "US": "US MARKET",
+    "IN": "INDIA MARKET", "JP": "JAPAN MARKET",
 }
+WEEKDAYS_KR = ["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"]
 
-def score_to_level(score_30: int) -> int:
-    """Convert 30-point score to 5-level importance."""
-    if score_30 >= 24: return 5
-    if score_30 >= 18: return 4
-    if score_30 >= 13: return 3
-    if score_30 >= 10: return 2
-    return 1
-
-LEVEL_BADGES = {
-    5: ("★★★★★", "#B45309", "#FEF3C7"),
-    4: ("★★★★☆", "#1E40AF", "#DBEAFE"),
-    3: ("★★★☆☆", "#065F46", "#D1FAE5"),
-    2: ("★★☆☆☆", "#6B7280", "#F3F4F6"),
-    1: ("★☆☆☆☆", "#9CA3AF", "#F9FAFB"),
+SECTOR_ORDER = ["경쟁사활동", "윤활유동향", "전방산업동향", "윤활유규제"]
+SECTOR_CONFIGS = {
+    "경쟁사활동":  {"icon": "⚔️",  "border": "#C8121A", "bg": "#FDFAFA"},
+    "윤활유동향":  {"icon": "📊",  "border": "#2B7BB9", "bg": "#F7FAFD"},
+    "전방산업동향": {"icon": "🏭", "border": "#3D8B37", "bg": "#F7FDF7"},
+    "윤활유규제":  {"icon": "📋",  "border": "#7B5EA7", "bg": "#FAF7FD"},
 }
-
-FONT_STACK = "'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR',Arial,Helvetica,sans-serif"
-BRAND_RED = "#E5191E"
-NAVY = "#1B3C6E"
-DARK_BG = "#0F172A"
-CARD_BG = "#1E293B"
-
-NEWSLETTER_PROMPT = """You are a premium newsletter designer for SK Enmove's Global MI (Market Intelligence) team.
-Create a STUNNING, professional HTML newsletter in Korean for the {country_name} lubricant market.
-
-Articles data:
-{articles_json}
-
-{audit_feedback}
-
-=== STRICT DESIGN REQUIREMENTS ===
-
-1. STRUCTURE (3 sections, clearly separated):
-   A. 📋 핵심 인사이트 (Executive Summary)
-      - 4-5 bullet points with red accent markers
-      - Each insight must reference specific data from the articles
-      - Business-critical tone, no fluff
-
-   B. 📰 섹터별 주요 뉴스 (Sector News)
-      - Group articles by sector: 윤활유동향, 경쟁사활동, 전방산업동향, 윤활유규제
-      - Each sector has a colored header bar
-      - Each article card shows: score badge, title (linked), Korean summary, source+date
-      - Score badge: 5=gold, 4=blue, 3=green (star ratings)
-
-   C. 💡 마케팅 전략 제언 (Strategic Recommendations)
-      - 3-5 numbered, specific, actionable recommendations
-      - Each must tie back to a specific news item or trend
-      - Format: Bold title + 1-2 sentence explanation
-
-2. VISUAL DESIGN (Email-safe, must look PREMIUM):
-   - Background: #f4f4f4
-   - Container: white, max-width 680px, centered, subtle shadow
-   - Header: Dark navy gradient (#1B3C6E → #0D2240), SK enmove red badge
-   - Section headers: Clean, bold, with colored left border accent
-   - Article cards: Light background, 1px border, 8px border-radius
-   - Score badges: Colored pills (gold/blue/green based on score)
-   - Typography: 'Malgun Gothic' stack, line-height 1.6
-   - Footer: Light gray, subtle, with disclaimer
-   - All CSS must be INLINE (no <style> blocks, no external CSS)
-   - Use TABLE layout for email compatibility (not div/flexbox)
-   - NO external images, fonts, or resources
-
-3. CONTENT RULES:
-   - ALL text in Korean (titles, summaries, insights, recommendations)
-   - Every article must link to its source URL
-   - Show collection period: "최근 {days}일" in the header
-   - Date format: YYYY.MM.DD
-   - No hallucinated data — only reference what's in the articles
-
-Output the COMPLETE HTML document. No markdown code fences. Start with <!DOCTYPE html>.
-"""
+PRIORITY_CONFIGS = [
+    {"label": "🔴 최우선", "color": "#C8121A", "border": "#C8121A", "bg": "#FDF7F7"},
+    {"label": "🟠 중요",   "color": "#D4700A", "border": "#D4700A", "bg": "#FDF9F4"},
+    {"label": "🔵 주목",   "color": "#2B7BB9", "border": "#2B7BB9", "bg": "#F4F8FD"},
+    {"label": "⚪ 참고",   "color": "#888888", "border": "#999999", "bg": "#F8F8F8"},
+]
+INSIGHT_NUMBERS = ["①", "②", "③", "④", "⑤"]
 
 
 def _esc(text: str) -> str:
-    """HTML-escape text."""
     return html_module.escape(str(text)) if text else ""
 
 
-def _format_date(date_str: str) -> str:
-    """Convert RSS date to clean Korean format."""
-    if not date_str:
-        return ""
-    from email.utils import parsedate_to_datetime
-    try:
-        dt = parsedate_to_datetime(date_str)
-        return dt.strftime("%Y.%m.%d")
-    except Exception:
-        # Already formatted or unknown format
-        if "." in date_str and len(date_str) <= 12:
-            return date_str
-        return date_str[:10] if len(date_str) > 10 else date_str
+def _score_to_stars(score: int) -> str:
+    """Convert 30-point score to 5-star HTML (gold filled + gray empty)."""
+    if score >= 24:
+        filled, empty = 5, 0
+    elif score >= 18:
+        filled, empty = 4, 1
+    elif score >= 13:
+        filled, empty = 3, 2
+    elif score >= 10:
+        filled, empty = 2, 3
+    else:
+        filled, empty = 1, 4
+    gold = f'<span style="font-family:Arial,sans-serif;font-size:16px;color:#DAA520;">{"★" * filled}</span>'
+    gray = f'<span style="font-family:Arial,sans-serif;font-size:16px;color:#DDD;">{"☆" * empty}</span>' if empty else ""
+    return gold + gray
 
 
-def _build_article_card(article: dict, idx: int) -> str:
-    """Build a single article card HTML with score-based visual emphasis."""
-    score = article.get("score", 0)
-    level = score_to_level(score)
-    badge_text, badge_color, badge_bg = LEVEL_BADGES.get(level, ("★☆☆☆☆", "#9CA3AF", "#F9FAFB"))
-    title = _esc(article.get("title_kr", article.get("title", "Untitled")))
+def _build_article_card(article: dict, is_last: bool = False) -> str:
+    title = _esc(article.get("title_kr", article.get("title", "")))
     summary = _esc(article.get("summary_kr", article.get("snippet", "")))
-    source = _esc(article.get("source", ""))
-    url = article.get("url", "#")
-    url_valid = article.get("url_valid", True)
-    date = _format_date(article.get("published_date", ""))
-
-    if url_valid and url and url != "#":
-        title_html = f'<a href="{url}" style="color:{NAVY};font-size:15px;font-weight:700;text-decoration:none;line-height:1.5" target="_blank">{title}</a>'
-        source_link = f' · <a href="{url}" style="color:#3B82F6;text-decoration:none;font-size:11px;font-weight:600" target="_blank">원문보기 →</a>'
-    else:
-        title_html = f'<span style="color:{NAVY};font-size:15px;font-weight:700;line-height:1.5">{title}</span>'
-        source_link = ""
-
-    # Global tag
+    score = article.get("score", 0)
     scope = article.get("scope", "local")
-    global_tag = '<span style="display:inline-block;background:#6366F1;color:#fff;font-size:9px;padding:1px 6px;border-radius:3px;font-weight:700;margin-left:6px;vertical-align:middle">GLOBAL</span>' if scope == "global" else ""
+    sector = article.get("sector", "윤활유동향")
+    cfg = SECTOR_CONFIGS.get(sector, SECTOR_CONFIGS["윤활유동향"])
+    margin_bottom = "4px" if is_last else "10px"
 
-    # Score 5 gets highlighted card with gold left border
-    if level >= 5:
-        card_bg = "#FFFBEB"
-        left_border = f"border-left:4px solid #F59E0B;"
-        hot_tag = '<span style="display:inline-block;background:#DC2626;color:#fff;font-size:10px;padding:1px 6px;border-radius:3px;font-weight:700;margin-left:6px;vertical-align:middle">HOT</span>'
-    elif level >= 4:
-        card_bg = "#F8FAFC"
-        left_border = f"border-left:3px solid #3B82F6;"
-        hot_tag = ""
+    global_badge = ""
+    if scope == "global":
+        global_badge = f"""
+                  <tr>
+                    <td>
+                      <span style="font-family:{FONT};font-size:12px;color:#666;font-weight:bold;background-color:#EBEBEB;padding:2px 7px;border-radius:3px;">🌐 GLOBAL</span>
+                    </td>
+                  </tr>"""
+        title_padding = "padding-top:7px;"
     else:
-        card_bg = "#ffffff"
-        left_border = ""
-        hot_tag = ""
+        title_padding = ""
 
-    return f"""<tr>
-<td style="padding:0">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:{card_bg};{left_border}">
-  <tr><td style="padding:18px 20px">
-    <table width="100%" cellpadding="0" cellspacing="0" border="0">
-    <tr><td>
-      <span style="display:inline-block;background-color:{badge_bg};color:{badge_color};font-size:10px;padding:3px 10px;border-radius:12px;font-weight:700;letter-spacing:0.5px">{badge_text} {score}/30</span>
-      {hot_tag}{global_tag}
-    </td></tr>
-    <tr><td style="padding-top:8px">
-      {title_html}
-    </td></tr>
-    <tr><td style="padding-top:8px">
-      <span style="font-size:13px;color:#4B5563;line-height:1.75;display:block">{summary}</span>
-    </td></tr>
-    <tr><td style="padding-top:10px">
-      <span style="font-size:11px;color:#9CA3AF">{source}{' · ' + date if date else ''}{source_link}</span>
-      {_build_related_sources(article)}
-    </td></tr>
-    </table>
-  </td></tr>
-  </table>
-</td>
-</tr>
-<tr><td style="height:1px;background:#E5E7EB;font-size:1px">&nbsp;</td></tr>"""
-
-
-def _build_related_sources(article: dict) -> str:
-    """Show related sources if article was grouped from multiple."""
-    related = article.get("related_sources", [])
-    if not related:
-        return ""
-    links = []
-    for r in related[:3]:
-        src = _esc(r.get("source", ""))
-        if src:
-            links.append(src)
-    if links:
-        return f'<br><span style="font-size:10px;color:#B0B8C4">관련: {", ".join(links)}</span>'
-    return ""
+    return f"""          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom:{margin_bottom};border-left:4px solid {cfg['border']};">
+            <tr>
+              <td style="background-color:{cfg['bg']};padding:13px 16px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">{global_badge}
+                  <tr><td style="{title_padding}font-family:{FONT};font-size:15px;font-weight:bold;color:#111;line-height:1.5;">{title}</td></tr>
+                  <tr><td style="padding-top:4px;">{_score_to_stars(score)}</td></tr>
+                  <tr><td style="padding-top:5px;"><em style="font-family:{FONT};font-size:14px;color:#666;line-height:1.7;font-style:italic;">{summary}</em></td></tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+"""
 
 
 def _build_sector_block(sector: str, articles: list) -> str:
-    """Build a sector section with all its articles."""
     if not articles:
         return ""
-
-    icon, color, eng_name = SECTOR_ICONS.get(sector, ("📰", "#6B7280", "Other"))
-
-    article_rows = ""
+    cfg = SECTOR_CONFIGS.get(sector, SECTOR_CONFIGS["윤활유동향"])
+    cards = ""
     for i, a in enumerate(articles[:5]):
-        article_rows += _build_article_card(a, i)
-
-    return f"""<tr>
-<td style="padding:0 32px 24px 32px">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #E5E7EB;border-radius:8px;overflow:hidden">
-  <tr>
-    <td style="background-color:{NAVY};padding:12px 20px">
-      <span style="color:#ffffff;font-size:14px;font-weight:700;letter-spacing:0.3px">{icon} {sector}</span>
-      <span style="color:rgba(255,255,255,0.6);font-size:11px;float:right;padding-top:2px">{len(articles)}건</span>
-    </td>
-  </tr>
-  {article_rows}
-  </table>
-</td>
-</tr>"""
+        cards += _build_article_card(a, is_last=(i == min(len(articles), 5) - 1))
+    return f"""
+          <!-- ── {sector} ── -->
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top:22px;">
+            <tr>
+              <td style="padding-bottom:10px;">
+                <span style="font-family:{FONT};font-size:16px;font-weight:bold;color:#555;">{cfg['icon']} &nbsp;{sector}</span>
+              </td>
+            </tr>
+          </table>
+{cards}"""
 
 
-def _build_kpi_bar(articles: list, sectors: dict) -> str:
-    """Build KPI dashboard bar with key metrics."""
-    total = len(articles)
-    avg_score = sum(a.get("score", 0) for a in articles) / max(total, 1)
-    top_sector = max(sectors.items(), key=lambda x: len(x[1]))[0] if sectors else "N/A"
-    high_priority = sum(1 for a in articles if a.get("score", 0) >= 4)
+def _build_kpi_dashboard(kpi: dict | None) -> str:
+    """Build KPI dashboard row: 환율 / 차량 등록 / 기준금리 / 소비자물가."""
+    if not kpi:
+        return ""
 
-    sector_icon = SECTOR_ICONS.get(top_sector, ("📰", "#6B7280", ""))[0]
+    ex = kpi.get("exchange_rate", {})
+    ir = kpi.get("interest_rate", {})
+    cpi = kpi.get("cpi", {})
+    vreg = kpi.get("vehicle_reg", {})
 
-    cells = [
-        (f"{total}", "분석 기사", "#2563EB"),
-        (f"{avg_score:.1f}", "평균 중요도", "#D97706"),
-        (f"{high_priority}", "긴급 뉴스", "#DC2626"),
-        (f"{sector_icon} {top_sector}", "핵심 섹터", "#059669"),
-    ]
+    # 환율
+    ex_val = ex.get("formatted", "N/A")
+    ex_label = ex.get("label", "환율")
 
-    html = ""
-    for value, label, color in cells:
-        html += f"""<td width="25%" align="center" style="padding:16px 8px;border-right:1px solid #E2E8F0">
-  <span style="display:block;font-size:20px;font-weight:800;color:{color}">{value}</span>
-  <span style="display:block;font-size:11px;color:#64748B;margin-top:2px">{label}</span>
-</td>"""
+    # 차량 등록 대수
+    vreg_val = vreg.get("formatted", "N/A")
+    vreg_period = vreg.get("period", "")
+    mom = vreg.get("mom_pct", 0)
+    if mom > 0:
+        mom_html = f'<span style="color:#2E7D32;font-size:12px;">▲ {mom:+.1f}%</span>'
+    elif mom < 0:
+        mom_html = f'<span style="color:#C62828;font-size:12px;">▼ {mom:.1f}%</span>'
+    else:
+        mom_html = '<span style="color:#888;font-size:12px;">→ 0.0%</span>'
 
-    return html
+    # 기준금리
+    ir_val = ir.get("formatted", "N/A")
+    ir_label = ir.get("label", "기준금리")
+    ir_updated = ir.get("updated", "")
+
+    # CPI
+    cpi_val = cpi.get("formatted", "N/A")
+    cpi_year = cpi.get("year", "")
+
+    cell_style = f"padding:14px 10px;text-align:center;border-right:1px solid #EBEBEB;vertical-align:top;"
+    last_cell_style = f"padding:14px 10px;text-align:center;vertical-align:top;"
+    title_style = f"font-family:{FONT};font-size:10px;color:#999;letter-spacing:1px;text-transform:uppercase;"
+    value_style = f"font-family:{FONT};font-size:18px;font-weight:bold;color:#1A1A1A;line-height:1.2;margin-top:4px;"
+    sub_style = f"font-family:{FONT};font-size:11px;color:#888;margin-top:3px;"
+
+    return f"""
+      <!-- ═══ KPI DASHBOARD ═══ -->
+      <tr>
+        <td style="background-color:#F8F8F8;border-top:3px solid #e3000f;border-bottom:1px solid #EBEBEB;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+            <tr>
+              <td colspan="4" style="padding:8px 16px 4px 16px;">
+                <span style="font-family:{FONT};font-size:10px;color:#999;letter-spacing:1.5px;">📊 &nbsp;시장 핵심 지표</span>
+              </td>
+            </tr>
+            <tr>
+              <td width="25%" style="{cell_style}">
+                <div style="{title_style}">환율</div>
+                <div style="{value_style}">{ex_val}</div>
+                <div style="{sub_style}">{ex_label}</div>
+              </td>
+              <td width="25%" style="{cell_style}">
+                <div style="{title_style}">차량 등록 (월간)</div>
+                <div style="{value_style}">{vreg_val}</div>
+                <div style="{sub_style}">{mom_html}&nbsp; {vreg_period} 기준</div>
+              </td>
+              <td width="25%" style="{cell_style}">
+                <div style="{title_style}">기준금리</div>
+                <div style="{value_style}">{ir_val}</div>
+                <div style="{sub_style}">{ir_label}<br>{ir_updated}</div>
+              </td>
+              <td width="25%" style="{last_cell_style}">
+                <div style="{title_style}">소비자 물가 (CPI)</div>
+                <div style="{value_style}">{cpi_val}</div>
+                <div style="{sub_style}">전년 대비 YoY&nbsp; {cpi_year}</div>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+"""
 
 
-def build_newsletter_html(country: str, articles: list, days: int, insights: list[str] = None, recommendations: list[str] = None) -> str:
-    """Build a complete professional newsletter HTML."""
+def _build_insights_html(insights: list) -> str:
+    rows = ""
+    for i, text in enumerate(insights[:5]):
+        num = INSIGHT_NUMBERS[i]
+        rows += f"""
+            <tr><td style="padding:6px 0;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td width="28" valign="top" style="font-family:{FONT};font-size:16px;color:#C8121A;font-weight:bold;line-height:1.6;">{num}</td>
+                  <td style="font-family:{FONT};font-size:15px;color:#333333;line-height:1.75;">{_esc(text)}</td>
+                </tr>
+              </table>
+            </td></tr>"""
+    return rows
+
+
+def _build_recommendations_html(recs: list) -> str:
+    rows = ""
+    for i, text in enumerate(recs[:4]):
+        cfg = PRIORITY_CONFIGS[i]
+        padding = "padding-bottom:10px;" if i < len(recs) - 1 else ""
+        rows += f"""
+            <tr><td style="{padding}">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-left:4px solid {cfg['border']};background-color:{cfg['bg']};">
+                <tr><td style="padding:13px 16px;">
+                  <div style="margin-bottom:7px;">
+                    <span style="font-family:{FONT};font-size:14px;font-weight:bold;color:{cfg['color']};">{cfg['label']}</span>
+                  </div>
+                  <div style="font-family:{FONT};font-size:15px;color:#333;line-height:1.75;">{_esc(text)}</div>
+                </td></tr>
+              </table>
+            </td></tr>"""
+    return rows
+
+
+def build_newsletter_html(
+    country: str,
+    articles: list,
+    days: int,
+    raw_count: int = 0,
+    source_count: int = 0,
+    insights: list = None,
+    recommendations: list = None,
+    kpi: dict = None,
+) -> str:
     name = COUNTRY_NAMES.get(country, country)
-    flag = COUNTRY_FLAGS.get(country, "")
-    today = datetime.now().strftime("%Y.%m.%d")
+    emoji = COUNTRY_EMOJIS.get(country, "🌐")
+    market_label = MARKET_LABELS.get(country, f"{country} MARKET")
+    now = datetime.now()
+    today = now.strftime("%Y.%m.%d")
+    weekday = WEEKDAYS_KR[now.weekday()]
+    sender_email = os.environ.get("GMAIL_SENDER", "skenbizst@gmail.com")
 
-    # Group articles by sector
+    # Group by sector and sort by score
     sectors: dict[str, list] = {}
     for a in articles:
         sector = a.get("sector", "윤활유동향")
         sectors.setdefault(sector, []).append(a)
-
-    # Sort each sector by score
     for s in sectors:
         sectors[s].sort(key=lambda x: x.get("score", 0), reverse=True)
 
-    # Build sector blocks
+    # Sector blocks
     sector_html = ""
-    for sector_name in ["경쟁사활동", "윤활유동향", "전방산업동향", "윤활유규제"]:
-        if sector_name in sectors:
-            sector_html += _build_sector_block(sector_name, sectors[sector_name])
+    for sector in SECTOR_ORDER:
+        if sector in sectors:
+            sector_html += _build_sector_block(sector, sectors[sector])
 
-    # Build insights section
+    # Fallback insights
     if not insights:
-        insights = []
-        top_articles = sorted(articles, key=lambda x: x.get("score", 0), reverse=True)[:5]
-        for a in top_articles:
-            summary = a.get("summary_kr", a.get("snippet", a.get("title", "")))
-            if summary:
-                insights.append(summary[:120])
+        top = sorted(articles, key=lambda x: x.get("score", 0), reverse=True)[:5]
+        insights = [a.get("summary_kr", a.get("snippet", a.get("title", "")))[:120] for a in top if a.get("summary_kr") or a.get("snippet")]
 
-    insights_html = ""
-    insight_icons = ["🔥", "📈", "⚡", "🎯", "🔍"]
-    for i, ins in enumerate(insights[:5]):
-        icon = insight_icons[i] if i < len(insight_icons) else "▶"
-        insights_html += f"""<tr><td style="padding:8px 0">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0">
-  <tr>
-    <td width="30" valign="top" style="padding-top:2px"><span style="font-size:16px">{icon}</span></td>
-    <td style="padding-left:8px;font-size:14px;color:#374151;line-height:1.65">{_esc(ins)}</td>
-  </tr>
-  </table>
-</td></tr>"""
-
-    # Build recommendations
+    # Fallback recommendations
     if not recommendations:
         recommendations = [
-            f"경쟁사 동향 분석을 바탕으로 대응 전략 수립 검토 필요",
-            f"시장 규제 변화에 선제적으로 대응하여 인증 선점 기회 모색",
-            f"전방산업 수요 변화를 반영한 제품 포트폴리오 최적화",
+            "경쟁사 동향 분석 기반 대응 전략 수립 검토 필요.",
+            "시장 규제 변화 선제 대응을 통한 인증 선점 기회 모색.",
+            "전방산업 수요 변화 반영 제품 포트폴리오 최적화.",
+            "프리미엄 제품군 재고 전략 조기 재검토 필요.",
         ]
 
-    # Priority labels for recommendations
-    priority_labels = ["🔴 최우선", "🟠 중요", "🟡 주목", "🔵 참고", "⚪ 모니터링"]
+    insights_html = _build_insights_html(insights)
+    recs_html = _build_recommendations_html(recommendations)
+    kpi_html = _build_kpi_dashboard(kpi)
 
-    recs_html = ""
-    for i, rec in enumerate(recommendations[:5], 0):
-        prio = priority_labels[i] if i < len(priority_labels) else ""
-        recs_html += f"""<tr><td style="padding:12px 0;font-size:14px;color:#374151;line-height:1.6;border-bottom:1px solid #E8ECF4">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-    <td width="28" valign="top"><span style="display:inline-block;background:{NAVY};color:#fff;width:24px;height:24px;border-radius:50%;text-align:center;line-height:24px;font-size:12px;font-weight:700">{i+1}</span></td>
-    <td style="padding-left:10px"><span style="font-size:11px;color:#6B7280">{prio}</span><br><span style="font-weight:600">{_esc(rec)}</span></td>
-  </tr></table>
-</td></tr>"""
-
-    total_articles = len(articles)
-    total_sources = len(set(a.get("source", "") for a in articles if a.get("source")))
+    collected_count = raw_count if raw_count > 0 else len(articles)
+    sources = source_count if source_count > 0 else len(set(a.get("source", "") for a in articles if a.get("source")))
 
     return f"""<!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SK엔무브 글로벌 MI 뉴스레터 — {name}</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="x-apple-disable-message-reformatting">
+  <title>SK엔무브 윤활유 시장 인텔리전스 뉴스레터</title>
+  <!--[if mso]>
+  <noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript>
+  <![endif]-->
+  <style>
+    body {{ margin:0; padding:0; background-color:#F0F0F0; }}
+    table {{ border-collapse:collapse; mso-table-lspace:0pt; mso-table-rspace:0pt; }}
+    img {{ border:0; display:block; }}
+  </style>
 </head>
-<body style="margin:0;padding:0;background-color:#f4f4f4;font-family:{FONT_STACK};line-height:1.6;color:#333333;-webkit-text-size-adjust:100%">
+<body style="margin:0;padding:0;background-color:#F0F0F0;font-family:{FONT};">
 
-<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f4f4">
-<tr><td align="center" style="padding:24px 12px">
+<!--[if mso]>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#F0F0F0"><tr><td>
+<![endif]-->
 
-<table width="680" cellpadding="0" cellspacing="0" border="0" style="background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08)">
-
-<!-- ═══ HEADER ═══ -->
-<tr>
-<td style="background-color:{NAVY};padding:36px 40px;text-align:center">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0">
-  <tr><td align="center">
-    <table cellpadding="0" cellspacing="0" border="0">
-    <tr>
-      <td style="background-color:{BRAND_RED};color:#ffffff;font-weight:800;font-size:14px;padding:6px 16px;border-radius:6px;letter-spacing:1.5px">SK enmove</td>
-    </tr>
-    </table>
-  </td></tr>
-  <tr><td align="center" style="padding-top:20px">
-    <span style="color:#ffffff;font-size:26px;font-weight:800;letter-spacing:-0.5px;line-height:1.3">{flag} {name} 윤활유 시장 인텔리전스</span>
-  </td></tr>
-  <tr><td align="center" style="padding-top:10px">
-    <span style="color:#8BA4C4;font-size:13px">{today} | 최근 {days}일 동향 분석 | {total_articles}건 분석 · {total_sources}개 소스</span>
-  </td></tr>
-  </table>
-</td>
-</tr>
-
-<!-- ═══ KPI DASHBOARD ═══ -->
-<tr>
-<td style="padding:0">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F1F5F9">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#F0F0F0;">
   <tr>
-    {_build_kpi_bar(articles, sectors)}
-  </tr>
-  </table>
-</td>
-</tr>
+    <td align="center" style="padding:20px 8px;">
+    <table role="presentation" width="620" cellspacing="0" cellpadding="0" border="0" style="width:620px;max-width:620px;">
 
-<!-- ═══ EXECUTIVE SUMMARY ═══ -->
-<tr>
-<td style="padding:32px 32px 24px 32px">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#FFFBF0;border-left:4px solid {BRAND_RED};border-radius:0 8px 8px 0">
-  <tr><td style="padding:20px 24px">
-    <table width="100%" cellpadding="0" cellspacing="0" border="0">
-    <tr><td style="padding-bottom:14px">
-      <span style="font-size:18px;font-weight:800;color:{NAVY}">📋 핵심 인사이트</span>
-    </td></tr>
-    {insights_html}
+      <!-- ═══ HEADER ═══ -->
+      <!-- 라벨바: 주황 -->
+      <tr>
+        <td bgcolor="#f04c23" style="background-color:#f04c23;border-radius:8px 8px 0 0;padding:9px 28px;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+            <tr>
+              <td style="font-family:{FONT};font-size:10px;color:#FFFFFF;letter-spacing:2px;">SK ENMOVE &nbsp;&nbsp;·&nbsp;&nbsp; LUBRICANT MARKET INTELLIGENCE</td>
+              <td align="right" style="font-family:{FONT};font-size:10px;color:#FFFFFF;">{today} {weekday}</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <!-- 타이틀: 빨강 -->
+      <tr>
+        <td bgcolor="#e3000f" style="background-color:#e3000f;padding:20px 28px 0 28px;">
+          <div style="font-family:{FONT};font-size:12px;color:#FFFFFF;letter-spacing:1px;margin-bottom:1px;">{emoji} &nbsp;{market_label}</div>
+          <div style="font-family:{FONT};font-size:26px;font-weight:bold;color:#FFFFFF;line-height:1.2;letter-spacing:-0.5px;">{name} 윤활유 시장 Weekly Brief</div>
+        </td>
+      </tr>
+      <!-- 스페이서 -->
+      <tr>
+        <td bgcolor="#e3000f" style="background-color:#e3000f;height:24px;font-size:1px;line-height:1px;">&nbsp;</td>
+      </tr>
+      <!-- Pills -->
+      <tr>
+        <td bgcolor="#e3000f" style="background-color:#e3000f;padding:0 28px 11px 28px;">
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+            <tr>
+              <td style="padding:3px 0px;">
+                <span style="font-family:{FONT};font-size:13px;color:#FFFFFF;">📅 &nbsp;수집기간: 최근 {days}일</span>
+              </td>
+              <td style="width:8px;"></td>
+              <td style="padding:3px 0px;">
+                <span style="font-family:{FONT};font-size:13px;color:#FFFFFF;">📰 &nbsp;수집 기사: {collected_count}건</span>
+              </td>
+              <td style="width:8px;"></td>
+              <td style="padding:3px 0px;">
+                <span style="font-family:{FONT};font-size:13px;color:#FFFFFF;">🔍 &nbsp;출처 소스: {sources}개</span>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+
+{kpi_html}
+
+      <!-- ═══ BODY ═══ -->
+      <tr>
+        <td style="background-color:#FFFFFF;padding:28px 28px 0 28px;">
+
+          <!-- 핵심 인사이트 -->
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+            <tr>
+              <td style="border-bottom:2px solid #C8121A;padding-bottom:6px;">
+                <span style="font-family:{FONT};font-size:18px;font-weight:bold;color:#1A1A1A;">💡 핵심 인사이트</span>
+              </td>
+            </tr>
+          </table>
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top:14px;">
+{insights_html}
+          </table>
+
+        </td>
+      </tr>
+
+      <!-- 섹터별 주요 뉴스 -->
+      <tr>
+        <td style="background-color:#FFFFFF;padding:28px 28px 0 28px;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+            <tr>
+              <td style="border-bottom:2px solid #C8121A;padding-bottom:6px;">
+                <span style="font-family:{FONT};font-size:18px;font-weight:bold;color:#1A1A1A;">📌 섹터별 주요 뉴스</span>
+              </td>
+            </tr>
+          </table>
+{sector_html}
+        </td>
+      </tr>
+
+      <!-- 마케팅 전략 제언 -->
+      <tr>
+        <td style="background-color:#FFFFFF;padding:28px 28px 0 28px;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+            <tr>
+              <td style="border-bottom:2px solid #C8121A;padding-bottom:6px;">
+                <span style="font-family:{FONT};font-size:18px;font-weight:bold;color:#1A1A1A;">🎯 마케팅 전략 제언</span>
+              </td>
+            </tr>
+          </table>
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top:16px;">
+{recs_html}
+          </table>
+        </td>
+      </tr>
+
+      <!-- ═══ FOOTER ═══ -->
+      <tr>
+        <td style="background-color:#FFFFFF;padding:28px 28px 0 28px;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+            <tr><td style="border-top:1px solid #EEEEEE;"></td></tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td style="background-color:#1C1C1C;border-radius:0 0 8px 8px;padding:24px 28px;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+            <tr>
+              <td align="center" style="padding-bottom:10px;">
+                <span style="font-family:{FONT};font-size:16px;font-weight:bold;color:#FFFFFF;letter-spacing:2px;">SK ENMOVE</span>
+                <span style="font-family:{FONT};font-size:14px;color:#888;">&nbsp; · &nbsp;Lubricant Market Intelligence</span>
+              </td>
+            </tr>
+            <tr>
+              <td align="center" style="padding-bottom:10px;">
+                <span style="font-family:{FONT};font-size:13px;color:#666;line-height:1.8;">본 뉴스레터는 AI 기반 시장 인텔리전스 시스템에 의해 자동 생성되었습니다.<br>수록된 정보는 공개 소스 기반으로 수집·분석된 것이며, 단독 투자·사업 판단의 근거로 사용을 권장하지 않습니다.</span>
+              </td>
+            </tr>
+            <tr>
+              <td align="center" style="border-top:1px solid #333;padding-top:10px;">
+                <span style="font-family:{FONT};font-size:12px;color:#555;">© {now.year} SK Enmove &nbsp;|&nbsp; 발송일: {today} &nbsp;|&nbsp; 문의: {sender_email}</span>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+
     </table>
-  </td></tr>
-  </table>
-</td>
-</tr>
-
-<!-- ═══ SECTION DIVIDER ═══ -->
-<tr>
-<td style="padding:8px 32px 20px 32px">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0">
-  <tr>
-    <td style="border-bottom:2px solid {NAVY};padding-bottom:8px">
-      <span style="font-size:18px;font-weight:800;color:{NAVY}">📰 섹터별 주요 뉴스</span>
     </td>
   </tr>
-  </table>
-</td>
-</tr>
-
-<!-- ═══ SECTOR BLOCKS ═══ -->
-{sector_html}
-
-<!-- ═══ STRATEGIC RECOMMENDATIONS ═══ -->
-<tr>
-<td style="padding:8px 32px 32px 32px">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F0F4FF;border-left:4px solid {NAVY};border-radius:0 8px 8px 0">
-  <tr><td style="padding:20px 24px">
-    <table width="100%" cellpadding="0" cellspacing="0" border="0">
-    <tr><td style="padding-bottom:14px">
-      <span style="font-size:18px;font-weight:800;color:{NAVY}">💡 마케팅 전략 제언</span>
-    </td></tr>
-    {recs_html}
-    </table>
-  </td></tr>
-  </table>
-</td>
-</tr>
-
-<!-- ═══ FOOTER ═══ -->
-<tr>
-<td style="background-color:#F8FAFC;padding:24px 40px;text-align:center;border-top:1px solid #E5E7EB">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0">
-  <tr><td align="center">
-    <span style="color:#6B7280;font-size:12px;line-height:2">
-      SK Enmove Global MI Newsletter<br>
-      본 뉴스레터는 공개 소스 기반 자동 수집·분석 결과이며, 투자 조언이 아닙니다.<br>
-      <span style="color:#9CA3AF">Powered by LangGraph + Claude AI | Newsletter SaaS v1.0</span>
-    </span>
-  </td></tr>
-  </table>
-</td>
-</tr>
-
 </table>
-</td></tr>
-</table>
+
+<!--[if mso]>
+</td></tr></table>
+<![endif]-->
 
 </body>
 </html>"""
@@ -438,69 +458,81 @@ def build_newsletter_html(country: str, articles: list, days: int, insights: lis
 async def write_newsletter(state: NewsletterState) -> dict:
     """Generate HTML newsletters for all countries."""
     import anthropic
+    import asyncio
 
     grouped = state.get("grouped_articles", {})
+    raw_articles = state.get("raw_articles", {})
+    merged_articles = state.get("merged_articles", {})
+    kpi_data = state.get("kpi_data", {})
     days = state.get("days", 30)
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     newsletters: dict[str, str] = {}
-
     audit_feedback = state.get("audit_feedback", {})
     iteration = state.get("audit_iteration", 0)
-
-    if api_key:
-        client = anthropic.Anthropic(api_key=api_key)
-    else:
-        client = None
+    client = anthropic.Anthropic(api_key=api_key) if api_key else None
 
     for country, articles in grouped.items():
-        if len(articles) < 2:
-            logger.warning(f"[{country}] Only {len(articles)} articles, using minimal template")
+        # Raw collected count (before filtering)
+        raw_count = len(raw_articles.get(country, []))
+        # Unique sources from merged articles (more accurate)
+        merged = merged_articles.get(country, articles)
+        source_count = len(set(a.get("source", "") for a in merged if a.get("source")))
 
-        # Always use the structured template for consistent quality
-        # LLM generates insights and recommendations, template handles layout
-        insights = []
-        recommendations = []
+        insights: list[str] = []
+        recommendations: list[str] = []
 
         if client and len(articles) >= 2:
             try:
                 articles_summary = json.dumps(
-                    [{"title": a.get("title"), "summary_kr": a.get("summary_kr", a.get("snippet", "")),
-                      "sector": a.get("sector", "윤활유동향"), "score": a.get("score")}
+                    [{"title": a.get("title_kr", a.get("title", "")),
+                      "summary_kr": a.get("summary_kr", a.get("snippet", "")),
+                      "sector": a.get("sector", "윤활유동향"),
+                      "score": a.get("score", 0)}
                      for a in articles[:15]],
                     ensure_ascii=False,
                 )
-
                 feedback_text = ""
                 if country in audit_feedback and not audit_feedback[country].get("passed", True):
                     fb = audit_feedback[country]
-                    feedback_text = f"\nPrevious issues: {', '.join(fb.get('issues', []))}"
+                    feedback_text = f"\n이전 감사 지적 사항: {', '.join(fb.get('issues', []))}"
 
-                prompt = f"""Based on these {COUNTRY_NAMES.get(country, country)} lubricant market articles, generate:
-1. Exactly 5 Korean executive insights (핵심 인사이트) — each 1-2 sentences, data-driven, about lubricant sales impact
-2. Exactly 4 Korean strategic recommendations (전략 제언) — each specific and actionable for SK Enmove sales team
-{feedback_text}
+                prompt = f"""당신은 SK엔무브 글로벌 MI팀의 {COUNTRY_NAMES.get(country, country)} 시장 분석 전문가입니다.
+아래 기사 데이터를 바탕으로 다음을 작성하세요.{feedback_text}
 
-Articles: {articles_summary}
+규칙:
+- 반드시 명사형 종결어미 사용 (예: "~확인.", "~필요.", "~예상.", "~추진.")
+- 경영층 보고 톤, 데이터 기반, 구체적 수치/사실 인용
+- 핵심 인사이트: 5개, 각 1-2문장, 윤활유 판매/시장에 미치는 영향 중심
+- 전략 제언: 4개, SK엔무브 영업/마케팅팀 실행 가능한 구체적 액션
 
-Output JSON only: {{"insights": ["...", "..."], "recommendations": ["...", "..."]}}"""
+기사 데이터:
+{articles_summary}
 
-                import asyncio
+JSON만 출력: {{"insights": ["...", "...", "...", "...", "..."], "recommendations": ["...", "...", "...", "..."]}}"""
+
                 response = await asyncio.to_thread(
                     client.messages.create,
-                    model="claude-sonnet-4-20250514",
-                    max_tokens=1500,
+                    model="claude-sonnet-4-6",
+                    max_tokens=2000,
                     messages=[{"role": "user", "content": prompt}],
                 )
                 text = response.content[0].text.strip()
                 if "{" in text:
-                    data = json.loads(text[text.index("{"):text.rindex("}") + 1])
+                    data = json.loads(text[text.find("{"):text.rfind("}") + 1])
                     insights = data.get("insights", [])
                     recommendations = data.get("recommendations", [])
             except Exception as e:
-                logger.warning(f"[{country}] LLM insight generation failed: {e}")
+                logger.warning(f"[{country}] LLM generation failed: {e}")
 
         newsletters[country] = build_newsletter_html(
-            country, articles, days, insights, recommendations
+            country=country,
+            articles=articles,
+            days=days,
+            raw_count=raw_count,
+            source_count=source_count,
+            insights=insights,
+            recommendations=recommendations,
+            kpi=kpi_data.get(country),
         )
         logger.info(f"[{country}] Newsletter generated ({len(newsletters[country])} chars)")
         print(f"[{country}] Newsletter generated ({len(newsletters[country])} chars)", flush=True)

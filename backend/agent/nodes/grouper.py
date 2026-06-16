@@ -10,6 +10,7 @@ from backend.agent.state import NewsletterState, Article
 logger = logging.getLogger(__name__)
 
 SIMILARITY_THRESHOLD = 0.45  # Lowered for more aggressive grouping
+HIGH_SCORE_THRESHOLD = 24   # Articles scoring ≥24/30 are never grouped as secondary sources
 
 
 def normalize_text(text: str) -> str:
@@ -18,6 +19,11 @@ def normalize_text(text: str) -> str:
     text = re.sub(r'[^\w\s가-힣]', '', text)  # Keep letters, numbers, Korean, spaces
     text = re.sub(r'\s+', ' ', text)
     return text
+
+
+def _has_korean(text: str) -> bool:
+    """Check if text contains Korean characters."""
+    return bool(re.search(r'[가-힣]', text))
 
 
 def text_similarity(a: str, b: str) -> float:
@@ -31,9 +37,11 @@ def text_similarity(a: str, b: str) -> float:
     if a_norm in b_norm or b_norm in a_norm:
         return 0.9
 
-    # Extract key nouns (3+ char words)
-    a_words = set(w for w in a_norm.split() if len(w) >= 3)
-    b_words = set(w for w in b_norm.split() if len(w) >= 3)
+    # Extract key nouns — use 2+ chars for Korean (no spaces between words),
+    # 3+ chars for English
+    min_len = 2 if _has_korean(a_norm) else 3
+    a_words = set(w for w in a_norm.split() if len(w) >= min_len)
+    b_words = set(w for w in b_norm.split() if len(w) >= min_len)
     if a_words and b_words:
         overlap = len(a_words & b_words)
         total = min(len(a_words), len(b_words))
@@ -54,6 +62,16 @@ def articles_similar(a: Article, b: Article) -> bool:
     sim2 = text_similarity(a.get("title_kr", ""), b.get("title_kr", ""))
     if sim2 >= SIMILARITY_THRESHOLD:
         return True
+
+    # Compare Korean summaries (catches same-topic articles with different titles)
+    sum_a = a.get("summary_kr", "")
+    sum_b = b.get("summary_kr", "")
+    if sum_a and sum_b and len(sum_a) > 30 and len(sum_b) > 30:
+        sim3 = text_similarity(sum_a, sum_b)
+        # Higher threshold for summaries since they're longer and naturally more similar
+        threshold = 0.45 if a.get("sector") == b.get("sector") else 0.55
+        if sim3 >= threshold:
+            return True
 
     # Compare URLs (same article from different aggregators)
     url_a = a.get("url", "").split("?")[0].rstrip("/")
@@ -84,6 +102,10 @@ def group_by_similarity(articles: list[Article]) -> list[Article]:
 
         for j, other in enumerate(sorted_articles):
             if j <= i or j in used:
+                continue
+
+            # Premium articles (≥24/30) are never grouped as secondary sources — always independent
+            if other.get("score", 0) >= HIGH_SCORE_THRESHOLD:
                 continue
 
             if articles_similar(article, other):

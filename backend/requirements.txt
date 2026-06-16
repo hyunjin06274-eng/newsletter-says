@@ -17,6 +17,7 @@ beautifulsoup4>=4.12.0
 lxml>=4.9.0
 feedparser>=6.0.11
 trafilatura>=1.7.0
+googlenewsdecoder>=0.1.2
 
 # Translation
 deep-translator>=1.9.4

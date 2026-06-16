@@ -70,6 +70,9 @@ class NewsletterState(TypedDict, total=False):
     # Phase 4: Sending
     send_results: dict[str, bool]  # country -> success
 
+    # KPI data (fetched before writing)
+    kpi_data: dict[str, dict]  # country -> {exchange_rate, interest_rate, cpi, vehicle_reg}
+
     # SSE events
     events: list[dict]
 
@@ -82,6 +85,7 @@ PHASE_NAMES = [
     "scoring",
     "enrichment",
     "grouping",
+    "kpi",
     "writing",
     "auditing",
     "sending",

@@ -76,6 +76,16 @@ COUNTRY_INFO = {
            "competitors": "Petron, Shell Philippines, Caltex Philippines, Total Philippines"},
     "PK": {"name": "Pakistan", "lang": "Urdu/English",
            "competitors": "PSO, Shell Pakistan, Attock Petroleum, Caltex Pakistan, Total Parco"},
+    "GCC": {"name": "GCC (Gulf States)", "lang": "Arabic/English",
+            "competitors": "ADNOC Lubricants, Bapco, Shell Middle East, Castrol ME, Total ME, Petromin, Gulf Oil"},
+    "CN": {"name": "China", "lang": "Chinese (Simplified)",
+           "competitors": "Sinopec润滑油, PetroChina昆仑润滑油, Great Wall润滑油, Castrol China, Shell China, Mobil China"},
+    "US": {"name": "United States", "lang": "English",
+           "competitors": "Valvoline, Pennzoil, Mobil 1, Castrol US, Quaker State, Lucas Oil, Royal Purple"},
+    "IN": {"name": "India", "lang": "Hindi/English",
+           "competitors": "Castrol India, Gulf Oil India, Servo IOCL, MAK BPCL, HP Lubricants HPCL, Veedol"},
+    "JP": {"name": "Japan", "lang": "Japanese",
+           "competitors": "ENEOS, 出光興産 Idemitsu, Castrol Japan, Shell Helix Japan, Mobil Japan, トヨタ純正オイル"},
 }
 
 # when:{days}d restricts to recent articles only
@@ -88,6 +98,11 @@ GOOGLE_NEWS_RSS_LOCAL = {
     "TH": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=th&gl=TH&ceid=TH:th",
     "PH": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=en&gl=PH&ceid=PH:en",
     "PK": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=en&gl=PK&ceid=PK:en",
+    "GCC": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=ar&gl=SA&ceid=SA:ar",
+    "JP": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=ja&gl=JP&ceid=JP:ja",
+    "CN": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=zh-CN&gl=CN&ceid=CN:zh-Hans",
+    "IN": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=en&gl=IN&ceid=IN:en",
+    "US": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=en&gl=US&ceid=US:en",
 }
 
 
@@ -110,14 +125,15 @@ def generate_dynamic_queries(country: str, domain: str) -> list[str]:
         )
 
         response = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-4-6",
             max_tokens=500,
             messages=[{"role": "user", "content": prompt}],
         )
         text = response.content[0].text.strip()
         if "[" in text and "]" in text:
             try:
-                queries = json.loads(text[text.index("["):text.rindex("]") + 1])
+                s, e = text.find("["), text.rfind("]")
+                queries = json.loads(text[s:e + 1]) if s != -1 and e != -1 and e > s else []
             except json.JSONDecodeError:
                 queries = []
             logger.info(f"[{country}/{domain}] LLM generated {len(queries)} dynamic queries")
@@ -132,6 +148,30 @@ def generate_dynamic_queries(country: str, domain: str) -> list[str]:
 def fetch_google_news_rss(query: str, country: str, max_results: int = 15, days: int = 30) -> list[Article]:
     """Fetch articles from Google News RSS — LOCAL language FIRST, then English."""
     import feedparser
+
+    # GCC: collect from multiple member states (SA primary, AE secondary)
+    if country == "GCC":
+        gcc_articles = []
+        for gl_code in ["SA", "AE"]:
+            # Arabic feed
+            ar_url = f"https://news.google.com/rss/search?q={query.replace(' ', '+')}+when:{days}d&hl=ar&gl={gl_code}&ceid={gl_code}:ar"
+            # English feed
+            en_url = GOOGLE_NEWS_RSS_EN.format(query=query.replace(" ", "+"), country=gl_code, days=days)
+            for url in [ar_url, en_url]:
+                try:
+                    feed = feedparser.parse(url)
+                    for entry in feed.entries[:max_results]:
+                        gcc_articles.append(Article(
+                            url=entry.get("link", ""),
+                            title=entry.get("title", ""),
+                            snippet=entry.get("summary", ""),
+                            source=entry.get("source", {}).get("title", "Unknown"),
+                            published_date=entry.get("published", ""),
+                            country="GCC",
+                        ))
+                except Exception as e:
+                    logger.warning(f"RSS fetch failed for {query}/GCC({gl_code}): {e}")
+        return gcc_articles
 
     # Local language first (higher priority for country-specific results)
     urls = []

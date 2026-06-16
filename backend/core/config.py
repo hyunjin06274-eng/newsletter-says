@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     gmail_token_file: str = ".gmail_token.json"
 
     # Pipeline defaults
-    default_countries: list[str] = ["KR", "RU", "VN", "TH", "PH", "PK"]
+    default_countries: list[str] = ["KR", "RU", "VN", "TH", "PH", "PK", "GCC"]
     default_days: int = 30
     max_audit_iterations: int = 3
     default_schedule_day: str = "Tuesday"

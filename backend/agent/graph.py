@@ -24,6 +24,7 @@ from backend.agent.nodes.merger import merge_and_dedupe
 from backend.agent.nodes.scorer import score_articles
 from backend.agent.nodes.enricher import enrich_snippets
 from backend.agent.nodes.grouper import group_articles
+from backend.agent.nodes.kpi_fetcher import fetch_kpi_data
 from backend.agent.nodes.writer import write_newsletter
 from backend.agent.nodes.auditor import audit_newsletter
 from backend.agent.nodes.sender import send_newsletter
@@ -59,6 +60,7 @@ def create_graph() -> StateGraph:
     builder.add_node("score", score_articles)
     builder.add_node("enrich", enrich_snippets)
     builder.add_node("group", group_articles)
+    builder.add_node("fetch_kpi", fetch_kpi_data)
     builder.add_node("write", write_newsletter)
     builder.add_node("audit", audit_newsletter)
     builder.add_node("send", send_newsletter)
@@ -69,7 +71,8 @@ def create_graph() -> StateGraph:
     builder.add_edge("merge", "score")
     builder.add_edge("score", "enrich")
     builder.add_edge("enrich", "group")
-    builder.add_edge("group", "write")
+    builder.add_edge("group", "fetch_kpi")
+    builder.add_edge("fetch_kpi", "write")
     builder.add_edge("write", "audit")
 
     # Conditional: audit -> send or audit -> rewrite
@@ -104,7 +107,7 @@ def create_initial_state(
 ) -> NewsletterState:
     """Create initial state for a new run."""
     if countries is None:
-        countries = ["KR", "RU", "VN", "TH", "PH", "PK"]
+        countries = ["KR", "RU", "VN", "TH", "PH", "PK", "GCC", "CN", "US", "IN", "JP"]
     if date_str is None:
         date_str = datetime.now().strftime("%Y%m%d")
 

@@ -22,12 +22,13 @@ Criteria:
 4. Completeness: Has all 3 sections (핵심 인사이트, 섹터별 뉴스, 전략 제언)?
 5. Actionability: Are strategy recommendations specific and actionable?
 6. No CSR/ESG fluff: Avoids generic sustainability filler?
+7. Factual Fidelity: Does the newsletter accurately reflect the original articles' geopolitical and factual context without substitution or reinterpretation? (e.g., NOT replacing one conflict with another)
 
 Respond in JSON:
 {{
   "passed": true/false (true if avg score >= 3.5),
   "score": 0.0-5.0 (average),
-  "scores": {{"accuracy": N, "korean": N, "tone": N, "completeness": N, "actionability": N, "no_fluff": N}},
+  "scores": {{"accuracy": N, "korean": N, "tone": N, "completeness": N, "actionability": N, "no_fluff": N, "factual_fidelity": N}},
   "issues": ["issue1", "issue2"],
   "suggestions": ["suggestion1", "suggestion2"]
 }}
@@ -56,13 +57,14 @@ async def audit_newsletter(state: NewsletterState) -> dict:
                 prompt = AUDIT_PROMPT.format(html_preview=html[:3000])
                 response = await asyncio.to_thread(
                     client.messages.create,
-                    model="claude-sonnet-4-20250514",
+                    model="claude-sonnet-4-6",
                     max_tokens=500,
                     messages=[{"role": "user", "content": prompt}],
                 )
                 text = response.content[0].text.strip()
-                if "{" in text:
-                    data = json.loads(text[text.index("{"):text.rindex("}") + 1])
+                start, end = text.find("{"), text.rfind("}")
+                if start != -1 and end != -1 and end > start:
+                    data = json.loads(text[start:end + 1])
                     feedback[country] = AuditFeedback(
                         passed=data.get("passed", True),
                         score=data.get("score", 4.0),
