@@ -120,10 +120,10 @@ export default function SettingsPage() {
     if (local) applySettings(local);
 
     try {
-      // Load settings and recipients table in parallel
+      // Load settings (from Render) and recipients table (from Vercel → Supabase directly) in parallel
       const [settingsRes, recipientsRes] = await Promise.allSettled([
         apiFetch("/api/settings"),
-        apiFetch("/api/recipients"),
+        fetch("/api/recipients"),  // Next.js API route — Vercel calls Supabase directly, no Render needed
       ]);
 
       let settingsData: Settings | null = null;
