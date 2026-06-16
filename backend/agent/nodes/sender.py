@@ -46,7 +46,6 @@ def get_gmail_service():
 
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
-            # Update the env var with refreshed token (for logging)
             logger.info("Gmail token refreshed successfully")
 
         return build("gmail", "v1", credentials=creds)
@@ -110,41 +109,85 @@ async def send_newsletter(state: NewsletterState) -> dict:
     sender = os.environ.get("GMAIL_SENDER", "skenbizst@gmail.com")
     send_results: dict[str, bool] = {}
 
-    # Load recipients from Supabase Settings (to/cc per country)
+    # Load recipients — priority:
+    # 1. recipients table (flat TO-only, existing table)
+    # 2. settings.country_recipients (TO/CC split, with legacy {recipients} fallback)
+    # 3. DEFAULT_RECIPIENTS env var (TO-only)
     global_to: list[str] = []
     global_cc: list[str] = []
     country_to: dict[str, list[str]] = {}
     country_cc: dict[str, list[str]] = {}
-    try:
+
+    supabase_url = os.environ.get("SUPABASE_URL", "")
+    supabase_key = os.environ.get("SUPABASE_KEY", "")
+
+    if supabase_url and supabase_key:
         import requests as _req
-        supabase_url = os.environ.get("SUPABASE_URL", "")
-        supabase_key = os.environ.get("SUPABASE_KEY", "")
-        if supabase_url and supabase_key:
+        headers = {"apikey": supabase_key, "Authorization": f"Bearer {supabase_key}"}
+
+        # 1순위: recipients 테이블 (TO only)
+        try:
             resp = _req.get(
-                f"{supabase_url}/rest/v1/settings?order=id.desc&limit=1&select=country_recipients",
-                headers={"apikey": supabase_key, "Authorization": f"Bearer {supabase_key}"},
+                f"{supabase_url}/rest/v1/recipients?is_active=eq.true&select=email,country",
+                headers=headers,
                 timeout=10,
             )
             if resp.ok and resp.json():
-                for cr in resp.json()[0].get("country_recipients", []):
-                    # Support both new {to, cc} format and legacy {recipients} format
-                    to_list = cr.get("to", cr.get("recipients", []))
-                    cc_list = cr.get("cc", [])
-                    if cr.get("country") == "ALL":
-                        global_to = to_list
-                        global_cc = cc_list
+                for row in resp.json():
+                    raw_email = row.get("email", "")
+                    c = row.get("country", "ALL")
+                    # JSON 배열 문자열로 저장된 경우 파싱
+                    if isinstance(raw_email, str) and raw_email.startswith("["):
+                        try:
+                            emails = json.loads(raw_email)
+                        except Exception:
+                            emails = [raw_email]
                     else:
-                        country_to[cr["country"]] = to_list
-                        country_cc[cr["country"]] = cc_list
-                logger.info(f"Loaded recipients: global_to={global_to}, global_cc={global_cc}")
-                print(f"Loaded recipients: global_to={global_to}, global_cc={global_cc}", flush=True)
-    except Exception as e:
-        logger.warning(f"Failed to load recipients from Supabase: {e}")
+                        emails = [raw_email]
+                    for email in emails:
+                        email = str(email).strip()
+                        if not email or "@" not in email:
+                            continue
+                        if c == "ALL":
+                            global_to.append(email)
+                        else:
+                            country_to.setdefault(c, []).append(email)
+                logger.info(f"[recipients table] global_to={global_to}, extras={dict(country_to)}")
+                print(f"[recipients table] global_to={global_to}, extras={dict(country_to)}", flush=True)
+        except Exception as e:
+            logger.warning(f"Failed to load from recipients table: {e}")
 
-    # Fallback to env (TO only)
-    if not global_to:
+        # 2순위: settings.country_recipients — TO/CC 지원 (recipients 테이블 없을 때)
+        if not global_to and not country_to:
+            try:
+                resp = _req.get(
+                    f"{supabase_url}/rest/v1/settings?order=id.desc&limit=1&select=country_recipients",
+                    headers=headers,
+                    timeout=10,
+                )
+                if resp.ok and resp.json():
+                    for cr in resp.json()[0].get("country_recipients", []):
+                        # 신규 {to, cc} 포맷 + 구 {recipients} 포맷 호환
+                        to_list = cr.get("to", cr.get("recipients", []))
+                        cc_list = cr.get("cc", [])
+                        if cr.get("country") == "ALL":
+                            global_to = to_list
+                            global_cc = cc_list
+                        else:
+                            country_to[cr["country"]] = to_list
+                            country_cc[cr["country"]] = cc_list
+                    logger.info(f"[settings] global_to={global_to}, global_cc={global_cc}")
+                    print(f"[settings] global_to={global_to}, global_cc={global_cc}", flush=True)
+            except Exception as e:
+                logger.warning(f"Failed to load from settings: {e}")
+
+    # 3순위: DEFAULT_RECIPIENTS 환경변수 (TO only)
+    if not global_to and not country_to:
         env_recip = os.environ.get("DEFAULT_RECIPIENTS", "").split(",")
         global_to = [r.strip() for r in env_recip if r.strip()]
+        if global_to:
+            logger.info(f"[env fallback] DEFAULT_RECIPIENTS={global_to}")
+            print(f"[env fallback] DEFAULT_RECIPIENTS={global_to}", flush=True)
 
     try:
         service = await asyncio.to_thread(get_gmail_service)
@@ -164,7 +207,7 @@ async def send_newsletter(state: NewsletterState) -> dict:
         # Merge global + country-specific TO/CC
         to_list = list(global_to) + list(country_to.get(country, []))
         cc_list = list(global_cc) + list(country_cc.get(country, []))
-        # Dedupe while preserving order
+        # Dedupe; CC must not overlap with TO
         to_list = list(dict.fromkeys(r for r in to_list if r))
         cc_list = list(dict.fromkeys(r for r in cc_list if r and r not in to_list))
 
