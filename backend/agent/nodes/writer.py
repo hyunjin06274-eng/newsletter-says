@@ -68,14 +68,45 @@ def _score_to_stars(score: int) -> str:
     return gold + gray
 
 
+def _format_pub_date(raw: str) -> str:
+    """Parse published_date string to YYYY.MM.DD. Returns '발행일 미확인' if unparseable."""
+    if not raw:
+        return "발행일 미확인"
+    import re
+    from email.utils import parsedate_to_datetime
+    raw = raw.strip()
+    # Try RFC 2822 (RSS standard: "Mon, 16 Jun 2026 10:00:00 +0000")
+    try:
+        dt = parsedate_to_datetime(raw)
+        return dt.strftime("%Y.%m.%d")
+    except Exception:
+        pass
+    # Try ISO-like: 2026-06-16, 2026/06/16, 20260616
+    m = re.search(r"(\d{4})[-/.]?(\d{2})[-/.]?(\d{2})", raw)
+    if m:
+        return f"{m.group(1)}.{m.group(2)}.{m.group(3)}"
+    return "발행일 미확인"
+
+
 def _build_article_card(article: dict, is_last: bool = False) -> str:
-    title = _esc(article.get("title_kr", article.get("title", "")))
+    title_text = _esc(article.get("title_kr", article.get("title", "")))
     summary = _esc(article.get("summary_kr", article.get("snippet", "")))
     score = article.get("score", 0)
     scope = article.get("scope", "local")
     sector = article.get("sector", "윤활유동향")
     cfg = SECTOR_CONFIGS.get(sector, SECTOR_CONFIGS["윤활유동향"])
     margin_bottom = "4px" if is_last else "10px"
+
+    # Rule 2: 제목에 원문 URL 하이퍼링크
+    url = article.get("url", "")
+    if url:
+        title_html = f'<a href="{url}" target="_blank" style="color:#111;text-decoration:underline;">{title_text}</a>'
+    else:
+        title_html = title_text
+
+    # Rule 1: 원문 발행일 표시
+    pub_date = _format_pub_date(article.get("published_date", ""))
+    date_html = f'<span style="font-family:{FONT};font-size:12px;color:#999;">{pub_date}</span>'
 
     global_badge = ""
     if scope == "global":
@@ -93,9 +124,10 @@ def _build_article_card(article: dict, is_last: bool = False) -> str:
             <tr>
               <td style="background-color:{cfg['bg']};padding:13px 16px;">
                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">{global_badge}
-                  <tr><td style="{title_padding}font-family:{FONT};font-size:15px;font-weight:bold;color:#111;line-height:1.5;">{title}</td></tr>
+                  <tr><td style="{title_padding}font-family:{FONT};font-size:15px;font-weight:bold;color:#111;line-height:1.5;">{title_html}</td></tr>
+                  <tr><td style="padding-top:3px;">{date_html}</td></tr>
                   <tr><td style="padding-top:4px;">{_score_to_stars(score)}</td></tr>
-                  <tr><td style="padding-top:5px;"><em style="font-family:{FONT};font-size:14px;color:#666;line-height:1.7;font-style:italic;">{summary}</em></td></tr>
+                  <tr><td style="padding-top:5px;font-family:{FONT};font-size:14px;color:#444;line-height:1.7;">{summary}</td></tr>
                 </table>
               </td>
             </tr>
@@ -504,6 +536,9 @@ async def write_newsletter(state: NewsletterState) -> dict:
 - 경영층 보고 톤, 데이터 기반, 구체적 수치/사실 인용
 - 핵심 인사이트: 5개, 각 1-2문장, 윤활유 판매/시장에 미치는 영향 중심
 - 전략 제언: 4개, SK엔무브 영업/마케팅팀 실행 가능한 구체적 액션
+- [중요] 기사 원문에 명시된 사실만 서술. 추측·평가·전망 등 주관적 해석 금지.
+- [중요] 전문가 발언·인용 포함 시 반드시 출처 명시 (예: "XX사 CEO에 따르면").
+- [중요] agent 자신의 의견이나 추천을 추가하지 말 것.
 
 기사 데이터:
 {articles_summary}
