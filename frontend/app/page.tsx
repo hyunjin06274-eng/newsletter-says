@@ -15,12 +15,26 @@ const COUNTRY_FLAGS: Record<string, string> = {
   US: "\uD83C\uDDFA\uD83C\uDDF8",
   IN: "\uD83C\uDDEE\uD83C\uDDF3",
   JP: "\uD83C\uDDEF\uD83C\uDDF5",
+  AE: "\uD83C\uDDE6\uD83C\uDDEA",
+  SA: "\uD83C\uDDF8\uD83C\uDDE6",
+  OM: "\uD83C\uDDF4\uD83C\uDDF2",
+  EG: "\uD83C\uDDEA\uD83C\uDDEC",
+  MY: "\uD83C\uDDF2\uD83C\uDDFE",
+  KH: "\uD83C\uDDF0\uD83C\uDDED",
+  LA: "\uD83C\uDDF1\uD83C\uDDE6",
+  CL: "\uD83C\uDDE8\uD83C\uDDF1",
+  AU: "\uD83C\uDDE6\uD83C\uDDFA",
+  IL: "\uD83C\uDDEE\uD83C\uDDF1",
+  MN: "\uD83C\uDDF2\uD83C\uDDF3",
 };
 
 const COUNTRY_NAMES: Record<string, string> = {
   KR: "Korea", RU: "Russia", VN: "Vietnam",
   TH: "Thailand", PH: "Philippines", PK: "Pakistan",
   GCC: "GCC", CN: "China", US: "USA", IN: "India", JP: "Japan",
+  AE: "UAE", SA: "Saudi Arabia", OM: "Oman", EG: "Egypt",
+  MY: "Malaysia", KH: "Cambodia", LA: "Laos",
+  CL: "Chile", AU: "Australia", IL: "Israel", MN: "Mongolia",
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -292,7 +306,7 @@ export default function Dashboard() {
             Edit in Settings &rarr;
           </a>
         </div>
-        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3">
           {Object.entries(COUNTRY_FLAGS).map(([code, flag]) => (
             <div
               key={code}

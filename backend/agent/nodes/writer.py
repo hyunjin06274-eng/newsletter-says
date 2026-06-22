@@ -17,17 +17,26 @@ COUNTRY_NAMES = {
     "TH": "태국", "PH": "필리핀", "PK": "파키스탄",
     "GCC": "GCC(걸프협력회의)",
     "CN": "중국", "US": "미국", "IN": "인도", "JP": "일본",
+    "AE": "UAE", "SA": "사우디아라비아", "OM": "오만", "EG": "이집트",
+    "MY": "말레이시아", "KH": "캄보디아", "LA": "라오스",
+    "CL": "칠레", "AU": "호주", "IL": "이스라엘", "MN": "몽골",
 }
 COUNTRY_EMOJIS = {
     "KR": "🌏", "RU": "❄️", "VN": "🌴",
     "TH": "🌺", "PH": "🏝️", "PK": "🌙",
     "GCC": "🌙", "CN": "🐉", "US": "🗽", "IN": "🕌", "JP": "🗾",
+    "AE": "🇦🇪", "SA": "🇸🇦", "OM": "🇴🇲", "EG": "🇪🇬",
+    "MY": "🇲🇾", "KH": "🇰🇭", "LA": "🇱🇦",
+    "CL": "🇨🇱", "AU": "🦘", "IL": "🇮🇱", "MN": "🇲🇳",
 }
 MARKET_LABELS = {
     "KR": "KOREA MARKET", "RU": "RUSSIA MARKET", "VN": "VIETNAM MARKET",
     "TH": "THAILAND MARKET", "PH": "PHILIPPINES MARKET", "PK": "PAKISTAN MARKET",
     "GCC": "GCC MARKET", "CN": "CHINA MARKET", "US": "US MARKET",
     "IN": "INDIA MARKET", "JP": "JAPAN MARKET",
+    "AE": "UAE MARKET", "SA": "SAUDI ARABIA MARKET", "OM": "OMAN MARKET", "EG": "EGYPT MARKET",
+    "MY": "MALAYSIA MARKET", "KH": "CAMBODIA MARKET", "LA": "LAOS MARKET",
+    "CL": "CHILE MARKET", "AU": "AUSTRALIA MARKET", "IL": "ISRAEL MARKET", "MN": "MONGOLIA MARKET",
 }
 WEEKDAYS_KR = ["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"]
 

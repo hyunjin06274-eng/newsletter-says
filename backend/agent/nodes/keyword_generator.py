@@ -152,7 +152,6 @@ COUNTRY_CONTEXT = {
     "JP": {
         "name": "일본", "lang": "Japanese",
         "competitors": [
-            # 현지어 검색어 — Google JP 피드에서 검출율↑
             "ENEOSエンジンオイル 潤滑油",
             "出光興産 潤滑油 エンジンオイル",
             "カストロール 日本 エンジンオイル",
@@ -163,11 +162,11 @@ COUNTRY_CONTEXT = {
             "Idemitsu lubricant Japan engine oil",
         ],
         "forward_industries": [
-            "日本 自動車販売台数 乗用車",           # 일본 자동車 판매
-            "日本 ハイブリッド EV 潤滑油 需要",     # 하이브리드/EV 윤활유
-            "日本 二輪車 バイク 潤滑油",            # 오토바이
-            "JASO規格 エンジンオイル 日本",         # JASO 규격
-            "コマツ 日立建機 建設機械 潤滑油",      # 건설기계
+            "日本 自動車販売台数 乗用車",
+            "日本 ハイブリッド EV 潤滑油 需要",
+            "日本 二輪車 バイク 潤滑油",
+            "JASO規格 エンジンオイル 日本",
+            "コマツ 日立建機 建設機械 潤滑油",
             "Japan car sales Toyota Honda monthly",
             "Japan hybrid vehicle lubricant demand",
             "Japan lubricant export Asia Pacific",
@@ -178,6 +177,72 @@ COUNTRY_CONTEXT = {
             "日本潤滑油学会 tribology",
             "Japan lubricant market industry report",
         ],
+    },
+    "AE": {
+        "name": "UAE", "lang": "Arabic/English",
+        "competitors": ["ADNOC Lubricants UAE", "Shell UAE engine oil", "Castrol UAE", "Total Energies UAE", "Gulf Oil UAE", "Mobil UAE"],
+        "forward_industries": ["UAE automobile sales Dubai", "UAE construction fleet equipment", "UAE EV adoption Tesla BMW", "UAE fleet management lubricant", "UAE maritime port Jebel Ali lubricant", "UAE aviation lubricant"],
+        "local_media": ["Gulf News UAE automotive", "Khaleej Times oil lubricant UAE", "ADNOC downstream UAE", "Emirates automotive industry"],
+    },
+    "SA": {
+        "name": "사우디아라비아", "lang": "Arabic/English",
+        "competitors": ["Petromin lubricant Saudi Arabia", "ADNOC Saudi", "Shell Saudi Arabia", "Castrol KSA", "Total Energies Saudi", "Mobil Saudi Arabia"],
+        "forward_industries": ["Saudi Vision 2030 automotive", "Saudi car sales Toyota Hyundai", "Saudi EV electric vehicle policy", "Saudi construction fleet lubricant", "Saudi oil refinery base oil Aramco", "Saudi mining machinery lubricant"],
+        "local_media": ["Saudi Gazette automotive lubricant", "Arab News oil industry Saudi", "Aramco downstream lubricant", "Saudi automotive sector"],
+    },
+    "OM": {
+        "name": "오만", "lang": "Arabic/English",
+        "competitors": ["OmanOil lubricant", "Shell Oman", "Castrol Oman", "Total Energies Oman", "Gulf Oil Oman"],
+        "forward_industries": ["Oman car sales automobile", "Oman mining machinery lubricant", "Oman oil refinery Sohar", "Oman port logistics fleet", "Oman construction equipment"],
+        "local_media": ["Times of Oman automotive", "Oman Observer oil lubricant", "OmanOil downstream"],
+    },
+    "EG": {
+        "name": "이집트", "lang": "Arabic/English",
+        "competitors": ["Oilco Egypt lubricant", "Shell Egypt", "Castrol Egypt", "Total Egypt", "Mobil Egypt", "Egyptian lubricant market"],
+        "forward_industries": ["Egypt car sales automobile market", "Egypt motorcycle market", "Egypt construction infrastructure lubricant", "Egypt truck fleet commercial vehicle", "Egypt oil refinery base oil EGPC", "Egypt EV policy electric vehicle"],
+        "local_media": ["Al-Ahram economic Egypt automotive", "Egypt Today oil lubricant", "EGPC petroleum Egypt", "Cairo automotive market"],
+    },
+    "MY": {
+        "name": "말레이시아", "lang": "Malay/English",
+        "competitors": ["Petronas Syntium lubricant Malaysia", "Shell Malaysia engine oil", "Castrol Malaysia", "Total Malaysia lubricant", "Idemitsu Malaysia", "Mobil Malaysia"],
+        "forward_industries": ["Malaysia car sales Perodua Proton", "Malaysia motorcycle market lubricant", "Malaysia EV policy Proton EV", "Malaysia palm oil biofuel lubricant", "Malaysia construction equipment fleet", "Malaysia truck commercial vehicle lubricant"],
+        "local_media": ["The Star Malaysia automotive", "Malay Mail car sales lubricant", "Petronas downstream Malaysia", "Malaysia automotive institute"],
+    },
+    "KH": {
+        "name": "캄보디아", "lang": "Khmer/English",
+        "competitors": ["Total Cambodia lubricant", "Shell Cambodia engine oil", "Castrol Cambodia", "Caltex Cambodia", "Mobil Cambodia"],
+        "forward_industries": ["Cambodia motorcycle market lubricant", "Cambodia construction equipment boom", "Cambodia automotive sales import", "Cambodia truck fleet logistics", "Cambodia garment textile machinery"],
+        "local_media": ["Phnom Penh Post automotive Cambodia", "Khmer Times oil lubricant", "Cambodia construction industry"],
+    },
+    "LA": {
+        "name": "라오스", "lang": "Lao/English",
+        "competitors": ["Total Laos lubricant", "Shell Laos engine oil", "Castrol Laos", "Caltex Laos", "PTT Laos lubricant"],
+        "forward_industries": ["Laos motorcycle sales lubricant", "Laos construction hydropower equipment", "Laos truck fleet logistics", "Laos mining equipment lubricant", "Laos automotive import market"],
+        "local_media": ["Vientiane Times automotive Laos", "Laos construction industry lubricant", "Mekong region automotive"],
+    },
+    "CL": {
+        "name": "칠레", "lang": "Spanish",
+        "competitors": ["Copec lubricant Chile", "Shell Chile engine oil", "Castrol Chile", "Total Energies Chile", "Mobil Chile", "YPF Chile"],
+        "forward_industries": ["Chile car sales automobile market", "Chile mining copper lubricant equipment", "Chile truck fleet commercial vehicle", "Chile EV electric vehicle policy", "Chile construction equipment machinery", "Chile agriculture tractor lubricant"],
+        "local_media": ["La Tercera Chile automotive", "El Mercurio lubricant Chile", "ANAC Chile car sales", "Minería Chilena mining lubricant"],
+    },
+    "AU": {
+        "name": "호주", "lang": "English",
+        "competitors": ["Castrol Australia engine oil", "Mobil Synergy Australia", "Shell Helix Australia", "Total Energies Australia", "Penrite lubricant Australia", "Nulon Australia", "Valvoline Australia"],
+        "forward_industries": ["Australia car sales VFACTS", "Australia EV adoption Tesla policy", "Australia mining lubricant BHP Rio Tinto", "Australia truck fleet diesel lubricant", "Australia agriculture farm machinery lubricant", "Australia construction equipment lubricant"],
+        "local_media": ["FCAI Australia vehicle sales", "CarAdvice Australia lubricant", "Australian Mining lubricant", "Drive.com.au engine oil Australia"],
+    },
+    "IL": {
+        "name": "이스라엘", "lang": "Hebrew/English",
+        "competitors": ["Paz lubricant Israel", "Delek Israel engine oil", "Castrol Israel", "Total Israel lubricant", "Shell Israel", "Mobil Israel"],
+        "forward_industries": ["Israel car sales automobile import", "Israel EV electric vehicle adoption Tesla", "Israel defense military lubricant", "Israel construction equipment machinery", "Israel truck fleet logistics lubricant", "Israel agriculture machinery kibbutz"],
+        "local_media": ["Haaretz Israel automotive", "Ynet Israel car lubricant", "Israel Oil industry", "Israeli automotive market report"],
+    },
+    "MN": {
+        "name": "몽골", "lang": "Mongolian/English",
+        "competitors": ["Petro Mongolia lubricant", "Shell Mongolia engine oil", "Castrol Mongolia", "Total Mongolia", "Mobil Mongolia"],
+        "forward_industries": ["Mongolia mining lubricant Oyu Tolgoi", "Mongolia truck fleet diesel", "Mongolia automobile sales import", "Mongolia construction equipment", "Mongolia agriculture tractor lubricant", "Mongolia winter lubricant low temperature"],
+        "local_media": ["Mongolian Mining Journal lubricant", "UB Post Mongolia automotive", "Mongolia petroleum industry news"],
     },
 }
 

@@ -15,6 +15,17 @@ const ALL_COUNTRIES = [
   { code: "US", name: "USA", flag: "\uD83C\uDDFA\uD83C\uDDF8" },
   { code: "IN", name: "India", flag: "\uD83C\uDDEE\uD83C\uDDF3" },
   { code: "JP", name: "Japan", flag: "\uD83C\uDDEF\uD83C\uDDF5" },
+  { code: "AE", name: "UAE", flag: "\uD83C\uDDE6\uD83C\uDDEA" },
+  { code: "SA", name: "Saudi Arabia", flag: "\uD83C\uDDF8\uD83C\uDDE6" },
+  { code: "OM", name: "Oman", flag: "\uD83C\uDDF4\uD83C\uDDF2" },
+  { code: "EG", name: "Egypt", flag: "\uD83C\uDDEA\uD83C\uDDEC" },
+  { code: "MY", name: "Malaysia", flag: "\uD83C\uDDF2\uD83C\uDDFE" },
+  { code: "KH", name: "Cambodia", flag: "\uD83C\uDDF0\uD83C\uDDED" },
+  { code: "LA", name: "Laos", flag: "\uD83C\uDDF1\uD83C\uDDE6" },
+  { code: "CL", name: "Chile", flag: "\uD83C\uDDE8\uD83C\uDDF1" },
+  { code: "AU", name: "Australia", flag: "\uD83C\uDDE6\uD83C\uDDFA" },
+  { code: "IL", name: "Israel", flag: "\uD83C\uDDEE\uD83C\uDDF1" },
+  { code: "MN", name: "Mongolia", flag: "\uD83C\uDDF2\uD83C\uDDF3" },
 ];
 
 const DAYS_OF_WEEK = [

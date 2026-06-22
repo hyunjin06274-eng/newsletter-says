@@ -103,6 +103,17 @@ GOOGLE_NEWS_RSS_LOCAL = {
     "CN": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=zh-CN&gl=CN&ceid=CN:zh-Hans",
     "IN": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=en&gl=IN&ceid=IN:en",
     "US": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=en&gl=US&ceid=US:en",
+    "AE": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=ar&gl=AE&ceid=AE:ar",
+    "SA": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=ar&gl=SA&ceid=SA:ar",
+    "OM": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=ar&gl=OM&ceid=OM:ar",
+    "EG": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=ar&gl=EG&ceid=EG:ar",
+    "MY": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=ms&gl=MY&ceid=MY:ms",
+    "KH": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=en&gl=KH&ceid=KH:en",
+    "LA": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=en&gl=LA&ceid=LA:en",
+    "CL": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=es&gl=CL&ceid=CL:es",
+    "AU": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=en&gl=AU&ceid=AU:en",
+    "IL": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=iw&gl=IL&ceid=IL:iw",
+    "MN": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=en&gl=MN&ceid=MN:en",
 }
 
 

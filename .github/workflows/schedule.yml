@@ -35,7 +35,7 @@ env:
 jobs:
   run-newsletter:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 150
 
     steps:
       - name: Check allowed time window (07:00 KST = 22:00 UTC ± 3h)
@@ -72,7 +72,7 @@ jobs:
         run: |
           RUN_ID=$(python3 -c "import uuid; print(str(uuid.uuid4()))")
           DATE_STR=$(date +%Y%m%d)
-          COUNTRIES='["KR","RU","VN","TH","PH","PK","GCC","CN","US","IN","JP"]'
+          COUNTRIES='["KR","RU","VN","TH","PH","PK","GCC","CN","US","IN","JP","AE","SA","OM","EG","MY","KH","LA","CL","AU","IL","MN"]'
           echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
           echo "DATE_STR=$DATE_STR" >> $GITHUB_ENV
           curl -s -X POST "${{ secrets.SUPABASE_URL }}/rest/v1/runs" \
@@ -135,7 +135,7 @@ jobs:
           asyncio.run(main())
           "
         env:
-          INPUT_COUNTRIES: ${{ github.event.inputs.countries || 'KR,RU,VN,TH,PH,PK,GCC,CN,US,IN,JP' }}
+          INPUT_COUNTRIES: ${{ github.event.inputs.countries || 'KR,RU,VN,TH,PH,PK,GCC,CN,US,IN,JP,AE,SA,OM,EG,MY,KH,LA,CL,AU,IL,MN' }}
           INPUT_DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
 
       - name: Update Supabase run to "completed"
