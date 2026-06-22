@@ -2,6 +2,7 @@ services:
   - type: web
     name: newsletter-saas-api
     runtime: python
+    autoDeploy: true
     buildCommand: pip install -r backend/requirements.txt
     startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
     envVars:
