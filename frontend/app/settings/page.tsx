@@ -111,11 +111,11 @@ export default function SettingsPage() {
     const cc: Record<string, string> = {};
     for (const cr of data.schedule.country_recipients || []) {
       if (cr.country === "ALL") {
-        setGlobalTo((cr.to || []).join(", "));
-        setGlobalCc((cr.cc || []).join(", "));
+        setGlobalTo((cr.to || []).join("\n"));
+        setGlobalCc((cr.cc || []).join("\n"));
       } else {
-        to[cr.country] = (cr.to || []).join(", ");
-        cc[cr.country] = (cr.cc || []).join(", ");
+        to[cr.country] = (cr.to || []).join("\n");
+        cc[cr.country] = (cr.cc || []).join("\n");
       }
     }
     setRecipientsTo(to);
@@ -194,7 +194,7 @@ export default function SettingsPage() {
   }
 
   function parseEmails(str: string): string[] {
-    return str.split(",").map((e) => e.trim()).filter(Boolean);
+    return str.split(/[\n,]+/).map((e) => e.trim()).filter(Boolean);
   }
 
   async function saveSettings() {
@@ -419,70 +419,141 @@ export default function SettingsPage() {
       <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
         <h2 className="text-lg font-semibold mb-2">Recipients</h2>
         <p className="text-gray-500 text-xs mb-6">
-          TO: 주 수신자 (이름 표시됨) &nbsp;·&nbsp; CC: 참조 수신자 (이름 표시됨)
+          TO: 주 수신자 &nbsp;·&nbsp; CC: 참조 수신자 &nbsp;·&nbsp;
+          <span className="text-gray-600">이메일 주소를 한 줄에 하나씩 입력 (쉼표도 가능)</span>
         </p>
 
         {/* Global recipients */}
         <div className="p-4 bg-gray-800/80 rounded-lg border border-gray-700 mb-6">
-          <label className="block text-sm font-medium text-white mb-1">All Countries (공통 수신자)</label>
-          <p className="text-gray-500 text-xs mb-3">모든 국가 뉴스레터에 공통으로 발송됩니다.</p>
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-sm font-medium text-white">All Countries (공통 수신자)</label>
+            <span className="text-xs text-gray-500">
+              TO {globalTo ? parseEmails(globalTo).length : 0}명
+              {globalCc ? ` · CC ${parseEmails(globalCc).length}명` : ""}
+            </span>
+          </div>
+          <p className="text-gray-500 text-xs mb-3">모든 국가 뉴스레터에 공통으로 발송됩니다. 이메일 주소를 한 줄에 하나씩 입력하세요.</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs text-gray-400 mb-1">TO</label>
-              <input
-                type="text"
-                placeholder="team@company.com, manager@company.com"
+              <textarea
+                rows={Math.max(3, parseEmails(globalTo).length + 1)}
+                placeholder={"team@company.com\nmanager@company.com"}
                 value={globalTo}
                 onChange={(e) => setGlobalTo(e.target.value)}
-                className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2.5 text-sm text-gray-200 placeholder-gray-600 focus:border-blue-500 focus:outline-none"
+                className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2.5 text-sm text-gray-200 placeholder-gray-600 focus:border-blue-500 focus:outline-none resize-none font-mono leading-relaxed"
               />
             </div>
             <div>
               <label className="block text-xs text-gray-400 mb-1">CC</label>
-              <input
-                type="text"
-                placeholder="cc@company.com"
+              <textarea
+                rows={Math.max(3, parseEmails(globalCc).length + 1)}
+                placeholder={"cc@company.com"}
                 value={globalCc}
                 onChange={(e) => setGlobalCc(e.target.value)}
-                className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2.5 text-sm text-gray-200 placeholder-gray-600 focus:border-blue-500 focus:outline-none"
+                className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2.5 text-sm text-gray-200 placeholder-gray-600 focus:border-blue-500 focus:outline-none resize-none font-mono leading-relaxed"
               />
             </div>
           </div>
         </div>
 
         {/* Per-country recipients */}
-        <p className="text-gray-500 text-xs mb-3">국가별 추가 수신자 (해당 국가 뉴스레터에만 발송):</p>
-        <div className="space-y-2">
-          {ALL_COUNTRIES.map(({ code, name, flag }) => (
-            <div key={code} className="px-4 py-3 bg-gray-800/30 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">{flag}</span>
-                <span className="text-sm font-medium text-gray-300">{name}</span>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pl-7">
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">TO</label>
-                  <input
-                    type="text"
-                    placeholder="to@company.com"
-                    value={recipientsTo[code] || ""}
-                    onChange={(e) => setRecipientsTo((prev) => ({ ...prev, [code]: e.target.value }))}
-                    className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm text-gray-400 placeholder-gray-700 focus:border-blue-500 focus:outline-none"
-                  />
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-gray-500 text-xs">
+            국가별 추가 수신자 (해당 국가 뉴스레터에만 발송, 공통 수신자에 더해집니다):
+          </p>
+          <div className="flex items-center gap-3 text-xs text-gray-500">
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-green-500/70" /> 발송
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-gray-600" /> 제외
+            </span>
+            <button
+              onClick={() => setActiveCountries(ALL_COUNTRIES.map((c) => c.code))}
+              className="text-blue-400 hover:text-blue-300 underline"
+            >전체 선택</button>
+            <button
+              onClick={() => setActiveCountries([])}
+              className="text-gray-500 hover:text-gray-400 underline"
+            >전체 해제</button>
+          </div>
+        </div>
+        <div className="space-y-1">
+          {ALL_COUNTRIES.map(({ code, name, flag }) => {
+            const isActive = activeCountries.includes(code);
+            const toEmails = parseEmails(recipientsTo[code] || "");
+            const ccEmails = parseEmails(recipientsCc[code] || "");
+            const totalCount = toEmails.length + ccEmails.length;
+            return (
+              <div
+                key={code}
+                className={`rounded-lg border overflow-hidden transition-all ${
+                  isActive
+                    ? "border-gray-700 bg-gray-800/20"
+                    : "border-gray-800/50 bg-gray-900/20 opacity-50"
+                }`}
+              >
+                {/* Country header row */}
+                <div className={`flex items-center justify-between px-4 py-2.5 ${isActive ? "bg-gray-800/40" : "bg-gray-800/20"}`}>
+                  <div className="flex items-center gap-3">
+                    {/* Send toggle */}
+                    <button
+                      onClick={() => toggleCountry(code)}
+                      title={isActive ? "클릭하여 발송 제외" : "클릭하여 발송 포함"}
+                      className={`relative flex-shrink-0 w-9 h-5 rounded-full transition-colors ${
+                        isActive ? "bg-green-600" : "bg-gray-700"
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                          isActive ? "translate-x-4" : "translate-x-0.5"
+                        }`}
+                      />
+                    </button>
+                    <span className="text-base">{flag}</span>
+                    <span className={`text-sm font-medium ${isActive ? "text-gray-300" : "text-gray-600"}`}>{name}</span>
+                    <span className="text-xs text-gray-700">({code})</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {!isActive && (
+                      <span className="text-xs text-gray-600 bg-gray-800 px-2 py-0.5 rounded-full">발송 제외</span>
+                    )}
+                    {isActive && totalCount > 0 && (
+                      <span className="text-xs text-gray-500 bg-gray-700/50 px-2 py-0.5 rounded-full">
+                        TO {toEmails.length}{ccEmails.length > 0 ? ` · CC ${ccEmails.length}` : ""}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">CC</label>
-                  <input
-                    type="text"
-                    placeholder="cc@company.com"
-                    value={recipientsCc[code] || ""}
-                    onChange={(e) => setRecipientsCc((prev) => ({ ...prev, [code]: e.target.value }))}
-                    className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm text-gray-400 placeholder-gray-700 focus:border-blue-500 focus:outline-none"
-                  />
-                </div>
+                {/* TO / CC fields — only show when active */}
+                {isActive && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-gray-800">
+                    <div className="bg-gray-900/60 px-4 py-2">
+                      <label className="block text-xs text-gray-500 mb-1">TO</label>
+                      <textarea
+                        rows={Math.max(2, toEmails.length + 1)}
+                        placeholder={"to@company.com"}
+                        value={recipientsTo[code] || ""}
+                        onChange={(e) => setRecipientsTo((prev) => ({ ...prev, [code]: e.target.value }))}
+                        className="w-full bg-transparent border border-gray-700/50 rounded px-2 py-1.5 text-xs text-gray-300 placeholder-gray-700 focus:border-blue-500 focus:outline-none resize-none font-mono leading-relaxed"
+                      />
+                    </div>
+                    <div className="bg-gray-900/40 px-4 py-2">
+                      <label className="block text-xs text-gray-500 mb-1">CC</label>
+                      <textarea
+                        rows={Math.max(2, ccEmails.length + 1)}
+                        placeholder={"cc@company.com"}
+                        value={recipientsCc[code] || ""}
+                        onChange={(e) => setRecipientsCc((prev) => ({ ...prev, [code]: e.target.value }))}
+                        className="w-full bg-transparent border border-gray-700/50 rounded px-2 py-1.5 text-xs text-gray-300 placeholder-gray-700 focus:border-blue-500 focus:outline-none resize-none font-mono leading-relaxed"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
