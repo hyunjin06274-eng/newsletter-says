@@ -68,11 +68,50 @@ jobs:
       - name: Install dependencies
         run: pip install -r backend/requirements.txt langgraph langchain-core langchain-anthropic anthropic feedparser beautifulsoup4 lxml trafilatura deep-translator google-api-python-client google-auth google-auth-httplib2 google-auth-oauthlib google-genai pyyaml tenacity python-dateutil
 
+      - name: Load active countries from Supabase settings
+        run: |
+          # If countries were passed manually via workflow_dispatch, use those
+          MANUAL="${{ github.event.inputs.countries }}"
+          if [ -n "$MANUAL" ]; then
+            echo "ACTIVE_COUNTRIES=$MANUAL" >> $GITHUB_ENV
+            echo "Using manual input countries: $MANUAL"
+            exit 0
+          fi
+
+          # Otherwise read from Supabase settings table
+          RESPONSE=$(curl -s \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/settings?order=id.desc&limit=1&select=countries" \
+            -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}" \
+            --max-time 10) || true
+
+          COUNTRIES=$(echo "$RESPONSE" | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    if data and data[0].get('countries'):
+        print(','.join(data[0]['countries']))
+    else:
+        print('')
+except Exception as e:
+    print('', file=sys.stderr)
+    print('', end='')
+" 2>/dev/null)
+
+          if [ -n "$COUNTRIES" ]; then
+            echo "ACTIVE_COUNTRIES=$COUNTRIES" >> $GITHUB_ENV
+            echo "Loaded countries from Supabase settings: $COUNTRIES"
+          else
+            FALLBACK="KR,RU,VN,TH,PH,PK,GCC,CN,US,IN,JP,AE,SA,OM,EG,MY,KH,LA,CL,AU,IL,MN"
+            echo "ACTIVE_COUNTRIES=$FALLBACK" >> $GITHUB_ENV
+            echo "⚠️ Supabase settings unavailable — using fallback: $FALLBACK"
+          fi
+
       - name: Insert Supabase run row
         run: |
           RUN_ID=$(python3 -c "import uuid; print(str(uuid.uuid4()))")
           DATE_STR=$(date +%Y%m%d)
-          COUNTRIES='["KR","RU","VN","TH","PH","PK","GCC","CN","US","IN","JP","AE","SA","OM","EG","MY","KH","LA","CL","AU","IL","MN"]'
+          COUNTRIES=$(python3 -c "import json; print(json.dumps('$ACTIVE_COUNTRIES'.split(',')))")
           echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
           echo "DATE_STR=$DATE_STR" >> $GITHUB_ENV
           curl -s -X POST "${{ secrets.SUPABASE_URL }}/rest/v1/runs" \
@@ -135,7 +174,7 @@ jobs:
           asyncio.run(main())
           "
         env:
-          INPUT_COUNTRIES: ${{ github.event.inputs.countries || 'KR,RU,VN,TH,PH,PK,GCC,CN,US,IN,JP,AE,SA,OM,EG,MY,KH,LA,CL,AU,IL,MN' }}
+          INPUT_COUNTRIES: ${{ env.ACTIVE_COUNTRIES }}
           INPUT_DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
 
       - name: Update Supabase run to "completed"
