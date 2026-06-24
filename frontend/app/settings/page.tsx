@@ -75,6 +75,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [cronInfo, setCronInfo] = useState("");
 
   const STORAGE_KEY = "newsletter-saas-settings";
 
@@ -247,9 +248,16 @@ export default function SettingsPage() {
         });
         clearTimeout(timeout);
         if (res.ok) {
+          const resData = await res.json().catch(() => ({}));
           setSaved(true);
           setSaving(false);
-          setTimeout(() => setSaved(false), 3000);
+          if (resData.cron) {
+            setCronInfo(resData.cron_updated
+              ? `GitHub Actions 크론 업데이트됨: ${resData.cron} (UTC)`
+              : `설정 저장됨 (크론 업데이트 실패 — GH_DISPATCH_TOKEN 확인 필요)`
+            );
+          }
+          setTimeout(() => { setSaved(false); setCronInfo(""); }, 5000);
           return;
         } else {
           const errText = await res.text().catch(() => "");
@@ -292,6 +300,9 @@ export default function SettingsPage() {
           </button>
           {saveError && (
             <p className="text-xs text-red-400 max-w-xs text-right">{saveError}</p>
+          )}
+          {cronInfo && (
+            <p className="text-xs text-green-400 max-w-xs text-right">{cronInfo}</p>
           )}
         </div>
       </div>

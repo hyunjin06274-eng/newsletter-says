@@ -197,6 +197,78 @@ async def get_settings():
     )
 
 
+def _kst_to_cron(day_of_week: str, time_kst: str) -> str:
+    """Convert KST day+time to UTC cron expression (KST = UTC+9)."""
+    day_map = {
+        "Monday": 1, "Tuesday": 2, "Wednesday": 3, "Thursday": 4,
+        "Friday": 5, "Saturday": 6, "Sunday": 0,
+    }
+    hour_kst, minute_kst = map(int, time_kst.split(":"))
+    hour_utc = hour_kst - 9
+    day_num = day_map.get(day_of_week, 2)  # default Wednesday
+    if hour_utc < 0:
+        hour_utc += 24
+        day_num = (day_num - 1) % 7
+    return f"{minute_kst} {hour_utc} * * {day_num}"
+
+
+def _update_github_cron(new_cron: str) -> bool:
+    """Update the cron expression in .github/workflows/schedule.yml via GitHub API."""
+    import base64
+    import os
+    import re
+
+    token = os.environ.get("GH_DISPATCH_TOKEN", "")
+    if not token:
+        logging.getLogger(__name__).warning("GH_DISPATCH_TOKEN not set — skipping cron update")
+        return False
+
+    repo = "hyunjin06274-eng/newsletter-says"
+    path = ".github/workflows/schedule.yml"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+
+    # GET current file + SHA
+    resp = requests.get(f"https://api.github.com/repos/{repo}/contents/{path}", headers=headers, timeout=10)
+    if not resp.ok:
+        logging.getLogger(__name__).error(f"GitHub GET file failed: {resp.status_code}")
+        return False
+
+    data = resp.json()
+    current_sha = data["sha"]
+    current_content = base64.b64decode(data["content"]).decode("utf-8")
+
+    # Replace cron line
+    new_content = re.sub(
+        r'(- cron: ")[^"]+(")',
+        lambda m: f'{m.group(1)}{new_cron}{m.group(2)}',
+        current_content,
+    )
+    if new_content == current_content:
+        logging.getLogger(__name__).info("Cron unchanged, skipping GitHub update")
+        return True
+
+    # PUT updated file
+    put_resp = requests.put(
+        f"https://api.github.com/repos/{repo}/contents/{path}",
+        headers=headers,
+        json={
+            "message": f"chore: update cron schedule to '{new_cron}' (KST settings sync)",
+            "content": base64.b64encode(new_content.encode("utf-8")).decode("utf-8"),
+            "sha": current_sha,
+        },
+        timeout=15,
+    )
+    if put_resp.ok:
+        logging.getLogger(__name__).info(f"GitHub cron updated to: {new_cron}")
+        return True
+    else:
+        logging.getLogger(__name__).error(f"GitHub PUT file failed: {put_resp.status_code} {put_resp.text}")
+        return False
+
+
 @router.put("/settings")
 async def update_settings(body: ScheduleSettings):
     db = get_supabase()
@@ -226,7 +298,6 @@ async def update_settings(body: ScheduleSettings):
         result = db.insert("settings", payload)
 
     if result is None:
-        # Retry without new columns in case they don't exist in schema
         payload_fallback = {k: v for k, v in payload.items()
                             if k not in ("min_total_score", "min_country_score")}
         if existing:
@@ -234,7 +305,18 @@ async def update_settings(body: ScheduleSettings):
         else:
             db.insert("settings", payload_fallback)
 
-    return {"status": "ok", "message": "Settings saved"}
+    # Sync cron schedule to GitHub Actions if frequency is weekly
+    cron_updated = False
+    if body.frequency == "weekly":
+        new_cron = _kst_to_cron(body.day_of_week, body.time)
+        cron_updated = await asyncio.to_thread(_update_github_cron, new_cron)
+
+    return {
+        "status": "ok",
+        "message": "Settings saved",
+        "cron_updated": cron_updated,
+        "cron": _kst_to_cron(body.day_of_week, body.time) if body.frequency == "weekly" else None,
+    }
 
 
 @router.get("/logs/{run_id}")
