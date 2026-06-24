@@ -85,18 +85,7 @@ jobs:
             -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}" \
             --max-time 10) || true
 
-          COUNTRIES=$(echo "$RESPONSE" | python3 -c "
-import sys, json
-try:
-    data = json.load(sys.stdin)
-    if data and data[0].get('countries'):
-        print(','.join(data[0]['countries']))
-    else:
-        print('')
-except Exception as e:
-    print('', file=sys.stderr)
-    print('', end='')
-" 2>/dev/null)
+          COUNTRIES=$(echo "$RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(','.join(d[0]['countries']) if d and d[0].get('countries') else '')" 2>/dev/null || echo "")
 
           if [ -n "$COUNTRIES" ]; then
             echo "ACTIVE_COUNTRIES=$COUNTRIES" >> $GITHUB_ENV
@@ -111,7 +100,7 @@ except Exception as e:
         run: |
           RUN_ID=$(python3 -c "import uuid; print(str(uuid.uuid4()))")
           DATE_STR=$(date +%Y%m%d)
-          COUNTRIES=$(python3 -c "import json; print(json.dumps('$ACTIVE_COUNTRIES'.split(',')))")
+          COUNTRIES=$(python3 -c "import json,os; print(json.dumps(os.environ['ACTIVE_COUNTRIES'].split(',')))")
           echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
           echo "DATE_STR=$DATE_STR" >> $GITHUB_ENV
           curl -s -X POST "${{ secrets.SUPABASE_URL }}/rest/v1/runs" \
