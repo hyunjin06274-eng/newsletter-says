@@ -2,8 +2,8 @@ name: Newsletter Pipeline Schedule
 
 on:
   schedule:
-    # Run every Thursday at 08:00 KST (Wednesday 23:00 UTC)
-    - cron: "0 23 * * 3"
+    # Run every Thursday at 07:00 KST (Wednesday 22:00 UTC)
+    - cron: "0 22 * * 3"
   workflow_dispatch:
     inputs:
       countries:
