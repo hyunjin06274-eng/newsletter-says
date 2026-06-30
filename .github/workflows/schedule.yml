@@ -9,7 +9,7 @@ on:
       countries:
         description: "Comma-separated country codes (e.g., KR,RU,VN)"
         required: false
-        default: "KR,RU,VN,TH,PH,PK,GCC,CN,US,IN,JP"
+        default: ""
       dry_run:
         description: "Skip email sending"
         required: false
@@ -20,6 +20,10 @@ on:
         required: false
         type: boolean
         default: false
+      run_id:
+        description: "Run ID from backend (links GitHub Actions to DB row)"
+        required: false
+        default: ""
 
 env:
   ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -79,6 +83,23 @@ jobs:
 
       - name: Load active countries from Supabase settings
         run: |
+          # Read settings from Supabase (is_active + countries)
+          RESPONSE=$(curl -s \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/settings?order=id.desc&limit=1&select=countries,is_active" \
+            -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}" \
+            --max-time 10) || true
+
+          IS_ACTIVE=$(echo "$RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print('true' if not d or d[0].get('is_active', True) else 'false')" 2>/dev/null || echo "true")
+
+          # [Critical fix #3] Check is_active — skip if disabled
+          EVENT="${{ github.event_name }}"
+          FORCE="${{ github.event.inputs.force_run }}"
+          if [ "$IS_ACTIVE" = "false" ] && [ "$FORCE" != "true" ]; then
+            echo "⛔ is_active=false in settings — newsletter send is disabled. Set force_run=true to override."
+            exit 1
+          fi
+
           # If countries were passed manually via workflow_dispatch, use those
           MANUAL="${{ github.event.inputs.countries }}"
           if [ -n "$MANUAL" ]; then
@@ -87,13 +108,7 @@ jobs:
             exit 0
           fi
 
-          # Otherwise read from Supabase settings table
-          RESPONSE=$(curl -s \
-            "${{ secrets.SUPABASE_URL }}/rest/v1/settings?order=id.desc&limit=1&select=countries" \
-            -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}" \
-            --max-time 10) || true
-
+          # Otherwise use countries from Supabase settings
           COUNTRIES=$(echo "$RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(','.join(d[0]['countries']) if d and d[0].get('countries') else '')" 2>/dev/null || echo "")
 
           if [ -n "$COUNTRIES" ]; then
@@ -107,18 +122,38 @@ jobs:
 
       - name: Insert Supabase run row
         run: |
-          RUN_ID=$(python3 -c "import uuid; print(str(uuid.uuid4()))")
+          # Use run_id passed from backend if available (links to existing DB row)
+          PASSED_RUN_ID="${{ github.event.inputs.run_id }}"
+          if [ -n "$PASSED_RUN_ID" ]; then
+            RUN_ID="$PASSED_RUN_ID"
+            echo "Using run_id from backend: $RUN_ID"
+          else
+            RUN_ID=$(python3 -c "import uuid; print(str(uuid.uuid4()))")
+            echo "Generated new run_id: $RUN_ID"
+          fi
           DATE_STR=$(date +%Y%m%d)
           COUNTRIES=$(python3 -c "import json,os; print(json.dumps(os.environ['ACTIVE_COUNTRIES'].split(',')))")
           echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
           echo "DATE_STR=$DATE_STR" >> $GITHUB_ENV
-          curl -s -X POST "${{ secrets.SUPABASE_URL }}/rest/v1/runs" \
+          # PATCH if run already exists (from backend), INSERT if new (from schedule)
+          PATCH_RESP=$(curl -s -o /dev/null -w "%{http_code}" -X PATCH \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/runs?id=eq.$RUN_ID" \
             -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}" \
             -H "Content-Type: application/json" \
             -H "Prefer: return=minimal" \
-            -d "{\"id\":\"$RUN_ID\",\"date_str\":\"$DATE_STR\",\"countries\":$COUNTRIES,\"status\":\"running\",\"current_phase\":\"collection\"}" || true
-          echo "Supabase run created: $RUN_ID"
+            -d "{\"status\":\"running\",\"current_phase\":\"collection\",\"countries\":$COUNTRIES,\"date_str\":\"$DATE_STR\"}")
+          if [ "$PATCH_RESP" = "204" ]; then
+            echo "Supabase run $RUN_ID updated (existing row)"
+          else
+            curl -s -X POST "${{ secrets.SUPABASE_URL }}/rest/v1/runs" \
+              -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
+              -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}" \
+              -H "Content-Type: application/json" \
+              -H "Prefer: return=minimal" \
+              -d "{\"id\":\"$RUN_ID\",\"date_str\":\"$DATE_STR\",\"countries\":$COUNTRIES,\"status\":\"running\",\"current_phase\":\"collection\"}" || true
+            echo "Supabase run $RUN_ID inserted (new row)"
+          fi
 
       - name: Run newsletter pipeline
         run: |

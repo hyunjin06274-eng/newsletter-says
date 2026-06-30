@@ -46,6 +46,8 @@ async def trigger_github_action(run_id: str, countries: list[str], date_str: str
                 "inputs": {
                     "countries": ",".join(countries),
                     "dry_run": "false",
+                    "force_run": "true",
+                    "run_id": run_id,
                 },
             },
             timeout=10,
