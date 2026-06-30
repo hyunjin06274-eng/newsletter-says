@@ -156,6 +156,27 @@ def generate_dynamic_queries(country: str, domain: str) -> list[str]:
     return []
 
 
+def _is_within_days(published_date: str, days: int) -> bool:
+    """Return True if the article's published_date is within the last `days` days."""
+    if not published_date:
+        return True  # date unknown → keep
+    try:
+        from email.utils import parsedate_to_datetime
+        pub = parsedate_to_datetime(published_date)
+        cutoff = datetime.now(pub.tzinfo) - timedelta(days=days)
+        return pub >= cutoff
+    except Exception:
+        try:
+            from dateutil import parser as dateutil_parser
+            pub = dateutil_parser.parse(published_date)
+            if pub.tzinfo is None:
+                pub = pub.replace(tzinfo=datetime.now().astimezone().tzinfo)
+            cutoff = datetime.now(pub.tzinfo) - timedelta(days=days)
+            return pub >= cutoff
+        except Exception:
+            return True  # parse failed → keep
+
+
 def fetch_google_news_rss(query: str, country: str, max_results: int = 15, days: int = 30) -> list[Article]:
     """Fetch articles from Google News RSS — LOCAL language FIRST, then English."""
     import feedparser
@@ -182,7 +203,7 @@ def fetch_google_news_rss(query: str, country: str, max_results: int = 15, days:
                         ))
                 except Exception as e:
                     logger.warning(f"RSS fetch failed for {query}/GCC({gl_code}): {e}")
-        return gcc_articles
+        return [a for a in gcc_articles if _is_within_days(a.get("published_date", ""), days)]
 
     # Local language first (higher priority for country-specific results)
     urls = []
@@ -208,7 +229,7 @@ def fetch_google_news_rss(query: str, country: str, max_results: int = 15, days:
         except Exception as e:
             logger.warning(f"RSS fetch failed for {query}/{country}: {e}")
 
-    return articles
+    return [a for a in articles if _is_within_days(a.get("published_date", ""), days)]
 
 
 async def collect_for_country_domain(
