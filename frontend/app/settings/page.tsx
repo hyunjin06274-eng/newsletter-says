@@ -56,11 +56,10 @@ interface Settings {
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [frequency, setFrequency] = useState("weekly");
-  const [dayOfWeek, setDayOfWeek] = useState("Tuesday");
-  const [time, setTime] = useState("09:00");
+  const [dayOfWeek, setDayOfWeek] = useState("Thursday");
+  const [time, setTime] = useState("07:00");
   const [activeCountries, setActiveCountries] = useState<string[]>([]);
   const [isActive, setIsActive] = useState(true);
-  const [days, setDays] = useState(30);
 
   // Recipients: global TO/CC + per-country TO/CC
   const [globalTo, setGlobalTo] = useState("");
@@ -322,7 +321,7 @@ export default function SettingsPage() {
           </label>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm text-gray-400 mb-2">Frequency</label>
             <select value={frequency} onChange={(e) => setFrequency(e.target.value)}
@@ -343,17 +342,6 @@ export default function SettingsPage() {
             <label className="block text-sm text-gray-400 mb-2">Time (KST)</label>
             <input type="time" value={time} onChange={(e) => setTime(e.target.value)}
               className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white" />
-          </div>
-          <div>
-            <label className="block text-sm text-gray-400 mb-2">Collection Period</label>
-            <select value={days} onChange={(e) => setDays(Number(e.target.value))}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white">
-              <option value={7}>Last 7 days</option>
-              <option value={14}>Last 14 days</option>
-              <option value={30}>Last 30 days</option>
-              <option value={60}>Last 60 days</option>
-              <option value={90}>Last 90 days</option>
-            </select>
           </div>
         </div>
       </div>

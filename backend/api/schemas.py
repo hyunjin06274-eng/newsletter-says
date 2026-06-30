@@ -55,8 +55,8 @@ class CountryRecipients(BaseModel):
 
 class ScheduleSettings(BaseModel):
     frequency: str = "weekly"  # weekly, daily, monthly
-    day_of_week: str = "Wednesday"
-    time: str = "10:00"
+    day_of_week: str = "Thursday"
+    time: str = "07:00"
     countries: list[str] = ["KR", "RU", "VN", "TH", "PH", "PK", "GCC", "CN", "US", "IN", "JP", "AE", "SA", "OM", "EG", "MY", "KH", "LA", "CL", "AU", "IL", "MN"]
     is_active: bool = True
     country_recipients: list[CountryRecipients] = []

@@ -161,7 +161,7 @@ export default function Dashboard() {
           <h1 className="text-3xl font-bold">Dashboard</h1>
           <p className="text-gray-400 mt-1">SK Enmove Global MI Newsletter Pipeline</p>
           <div className="flex items-center gap-3 mt-2">
-            <span className="text-gray-600 text-xs">Schedule: Every Wednesday 07:00 KST</span>
+            <span className="text-gray-600 text-xs">Schedule: Every Thursday 07:00 KST</span>
             <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${
               apiConnected ? "bg-green-900/40 text-green-400"
                 : waking ? "bg-yellow-900/40 text-yellow-400"
@@ -223,25 +223,6 @@ export default function Dashboard() {
           )}
         </button>
 
-        {/* One-time Send */}
-        <button
-          onClick={() => {
-            if (confirm("11개국 뉴스레터를 즉시 생성하고 이메일 발송하시겠습니까?")) {
-              handleStartRun();
-            }
-          }}
-          disabled={isRunning}
-          className={`px-5 py-3 rounded-lg font-medium transition-all flex items-center gap-2 text-sm ${
-            isRunning
-              ? "bg-gray-800 text-gray-600 cursor-not-allowed"
-              : "bg-emerald-600 hover:bg-emerald-700 text-white hover:scale-105"
-          }`}
-        >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-          </svg>
-          One-time Send
-        </button>
         </div>
       </div>
 

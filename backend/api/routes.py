@@ -134,6 +134,8 @@ async def list_runs(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1,
         "select": "id,date_str,status,countries,total_sent,created_at",
         "order": "created_at.desc",
     }, limit=page_size, offset=offset)
+    # Get total count separately for correct pagination
+    all_rows = db.select("runs", {"select": "id"}) or []
     return RunListResponse(
         runs=[RunListItem(
             id=r["id"], date_str=r.get("date_str", ""),
@@ -141,7 +143,7 @@ async def list_runs(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1,
             countries=r.get("countries", []), total_sent=r.get("total_sent", 0),
             created_at=r.get("created_at", ""),
         ) for r in rows],
-        total=len(rows), page=page, page_size=page_size,
+        total=len(all_rows), page=page, page_size=page_size,
     )
 
 
@@ -179,8 +181,8 @@ async def get_settings():
             })
         schedule = ScheduleSettings(
             frequency=c.get("frequency", "weekly"),
-            day_of_week=c.get("day_of_week", "Tuesday"),
-            time=c.get("time", "09:00"),
+            day_of_week=c.get("day_of_week", "Thursday"),
+            time=c.get("time", "07:00"),
             countries=c.get("countries", ["KR", "RU", "VN", "TH", "PH", "PK", "GCC", "CN", "US", "IN", "JP"]),
             is_active=c.get("is_active", True),
             country_recipients=parsed_recipients,
@@ -207,14 +209,14 @@ def _kst_to_cron(day_of_week: str, time_kst: str) -> str:
     }
     hour_kst, minute_kst = map(int, time_kst.split(":"))
     hour_utc = hour_kst - 9
-    day_num = day_map.get(day_of_week, 2)  # default Wednesday
+    day_num = day_map.get(day_of_week, 3)  # default Wednesday (3)
     if hour_utc < 0:
         hour_utc += 24
         day_num = (day_num - 1) % 7
     return f"{minute_kst} {hour_utc} * * {day_num}"
 
 
-def _update_github_cron(new_cron: str) -> bool:
+def _update_github_cron(new_cron: str, day_of_week: str = "Thursday", time_kst: str = "07:00") -> bool:
     """Update the cron expression in .github/workflows/schedule.yml via GitHub API."""
     import base64
     import os
@@ -242,12 +244,19 @@ def _update_github_cron(new_cron: str) -> bool:
     current_sha = data["sha"]
     current_content = base64.b64decode(data["content"]).decode("utf-8")
 
-    # Replace cron line
+    # Replace cron line and update comment above it
     new_content = re.sub(
-        r'(- cron: ")[^"]+(")',
-        lambda m: f'{m.group(1)}{new_cron}{m.group(2)}',
+        r'# Run every .+\n(\s+- cron: ")[^"]+(")',
+        lambda m: f'# Run every {day_of_week} at {time_kst} KST\n{m.group(1)}{new_cron}{m.group(2)}',
         current_content,
     )
+    # Fallback: update cron only if comment pattern didn't match
+    if new_content == current_content:
+        new_content = re.sub(
+            r'(- cron: ")[^"]+(")',
+            lambda m: f'{m.group(1)}{new_cron}{m.group(2)}',
+            current_content,
+        )
     if new_content == current_content:
         logging.getLogger(__name__).info("Cron unchanged, skipping GitHub update")
         return True
@@ -311,7 +320,7 @@ async def update_settings(body: ScheduleSettings):
     cron_updated = False
     if body.frequency == "weekly":
         new_cron = _kst_to_cron(body.day_of_week, body.time)
-        cron_updated = await asyncio.to_thread(_update_github_cron, new_cron)
+        cron_updated = await asyncio.to_thread(_update_github_cron, new_cron, body.day_of_week, body.time)
 
     return {
         "status": "ok",

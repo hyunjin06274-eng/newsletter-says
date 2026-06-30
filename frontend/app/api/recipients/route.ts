@@ -1,16 +1,12 @@
 import { NextResponse } from "next/server";
 
-const SUPABASE_URL =
-  process.env.SUPABASE_URL ||
-  process.env.NEXT_PUBLIC_SUPABASE_URL ||
-  "https://qndliypxehqaveeuzwvg.supabase.co";
-
-const SUPABASE_KEY =
-  process.env.SUPABASE_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_KEY ||
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFuZGxpeXB4ZWhxYXZlZXV6d3ZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1NTcxNjgsImV4cCI6MjA5MTEzMzE2OH0.5KHO_4hutG7liDcOUS6houRX5V2YYkdp1-3lkTKUA20";
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+const SUPABASE_KEY = process.env.SUPABASE_KEY || process.env.NEXT_PUBLIC_SUPABASE_KEY || "";
 
 export async function GET() {
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
+    return NextResponse.json({ recipients: [] });
+  }
   try {
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/recipients?is_active=eq.true&select=email,country`,
