@@ -90,30 +90,30 @@ COUNTRY_INFO = {
 
 # when:{days}d restricts to recent articles only
 # Two variants: English and local language results
-GOOGLE_NEWS_RSS_EN = "https://news.google.com/rss/search?q={query}+when:{days}d&hl=en&gl={country}&ceid={country}:en"
+GOOGLE_NEWS_RSS_EN = "https://news.google.com/rss/search?q={query}&hl=en&gl={country}&ceid={country}:en"
 GOOGLE_NEWS_RSS_LOCAL = {
-    "KR": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=ko&gl=KR&ceid=KR:ko",
-    "RU": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=ru&gl=RU&ceid=RU:ru",
-    "VN": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=vi&gl=VN&ceid=VN:vi",
-    "TH": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=th&gl=TH&ceid=TH:th",
-    "PH": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=en&gl=PH&ceid=PH:en",
-    "PK": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=en&gl=PK&ceid=PK:en",
-    "GCC": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=ar&gl=SA&ceid=SA:ar",
-    "JP": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=ja&gl=JP&ceid=JP:ja",
-    "CN": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=zh-CN&gl=CN&ceid=CN:zh-Hans",
-    "IN": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=en&gl=IN&ceid=IN:en",
-    "US": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=en&gl=US&ceid=US:en",
-    "AE": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=ar&gl=AE&ceid=AE:ar",
-    "SA": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=ar&gl=SA&ceid=SA:ar",
-    "OM": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=ar&gl=OM&ceid=OM:ar",
-    "EG": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=ar&gl=EG&ceid=EG:ar",
-    "MY": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=ms&gl=MY&ceid=MY:ms",
-    "KH": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=en&gl=KH&ceid=KH:en",
-    "LA": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=en&gl=LA&ceid=LA:en",
-    "CL": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=es&gl=CL&ceid=CL:es",
-    "AU": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=en&gl=AU&ceid=AU:en",
-    "IL": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=iw&gl=IL&ceid=IL:iw",
-    "MN": "https://news.google.com/rss/search?q={query}+when:{days}d&hl=en&gl=MN&ceid=MN:en",
+    "KR": "https://news.google.com/rss/search?q={query}&hl=ko&gl=KR&ceid=KR:ko",
+    "RU": "https://news.google.com/rss/search?q={query}&hl=ru&gl=RU&ceid=RU:ru",
+    "VN": "https://news.google.com/rss/search?q={query}&hl=vi&gl=VN&ceid=VN:vi",
+    "TH": "https://news.google.com/rss/search?q={query}&hl=th&gl=TH&ceid=TH:th",
+    "PH": "https://news.google.com/rss/search?q={query}&hl=en&gl=PH&ceid=PH:en",
+    "PK": "https://news.google.com/rss/search?q={query}&hl=en&gl=PK&ceid=PK:en",
+    "GCC": "https://news.google.com/rss/search?q={query}&hl=ar&gl=SA&ceid=SA:ar",
+    "JP": "https://news.google.com/rss/search?q={query}&hl=ja&gl=JP&ceid=JP:ja",
+    "CN": "https://news.google.com/rss/search?q={query}&hl=zh-CN&gl=CN&ceid=CN:zh-Hans",
+    "IN": "https://news.google.com/rss/search?q={query}&hl=en&gl=IN&ceid=IN:en",
+    "US": "https://news.google.com/rss/search?q={query}&hl=en&gl=US&ceid=US:en",
+    "AE": "https://news.google.com/rss/search?q={query}&hl=ar&gl=AE&ceid=AE:ar",
+    "SA": "https://news.google.com/rss/search?q={query}&hl=ar&gl=SA&ceid=SA:ar",
+    "OM": "https://news.google.com/rss/search?q={query}&hl=ar&gl=OM&ceid=OM:ar",
+    "EG": "https://news.google.com/rss/search?q={query}&hl=ar&gl=EG&ceid=EG:ar",
+    "MY": "https://news.google.com/rss/search?q={query}&hl=ms&gl=MY&ceid=MY:ms",
+    "KH": "https://news.google.com/rss/search?q={query}&hl=en&gl=KH&ceid=KH:en",
+    "LA": "https://news.google.com/rss/search?q={query}&hl=en&gl=LA&ceid=LA:en",
+    "CL": "https://news.google.com/rss/search?q={query}&hl=es&gl=CL&ceid=CL:es",
+    "AU": "https://news.google.com/rss/search?q={query}&hl=en&gl=AU&ceid=AU:en",
+    "IL": "https://news.google.com/rss/search?q={query}&hl=iw&gl=IL&ceid=IL:iw",
+    "MN": "https://news.google.com/rss/search?q={query}&hl=en&gl=MN&ceid=MN:en",
 }
 
 
@@ -165,9 +165,9 @@ def fetch_google_news_rss(query: str, country: str, max_results: int = 15, days:
         gcc_articles = []
         for gl_code in ["SA", "AE"]:
             # Arabic feed
-            ar_url = f"https://news.google.com/rss/search?q={query.replace(' ', '+')}+when:{days}d&hl=ar&gl={gl_code}&ceid={gl_code}:ar"
+            ar_url = f"https://news.google.com/rss/search?q={query.replace(' ', '+')}&hl=ar&gl={gl_code}&ceid={gl_code}:ar"
             # English feed
-            en_url = GOOGLE_NEWS_RSS_EN.format(query=query.replace(" ", "+"), country=gl_code, days=days)
+            en_url = GOOGLE_NEWS_RSS_EN.format(query=query.replace(" ", "+"), country=gl_code)
             for url in [ar_url, en_url]:
                 try:
                     feed = feedparser.parse(url)
@@ -188,9 +188,9 @@ def fetch_google_news_rss(query: str, country: str, max_results: int = 15, days:
     urls = []
     local_template = GOOGLE_NEWS_RSS_LOCAL.get(country)
     if local_template:
-        urls.append(local_template.format(query=query.replace(" ", "+"), days=days))
+        urls.append(local_template.format(query=query.replace(" ", "+")))
     # English as fallback (fewer results to avoid flooding with global news)
-    urls.append(GOOGLE_NEWS_RSS_EN.format(query=query.replace(" ", "+"), country=country, days=days))
+    urls.append(GOOGLE_NEWS_RSS_EN.format(query=query.replace(" ", "+"), country=country))
     articles = []
 
     for url in urls:
