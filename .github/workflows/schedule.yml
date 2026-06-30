@@ -38,23 +38,32 @@ jobs:
     timeout-minutes: 150
 
     steps:
-      - name: Check allowed time window (07:00 KST = 22:00 UTC ± 3h)
+      - name: Check allowed time window
         run: |
+          EVENT="${{ github.event_name }}"
           FORCE="${{ github.event.inputs.force_run }}"
+
+          # schedule 트리거는 크론 자체가 정확한 시간이므로 항상 통과
+          if [ "$EVENT" = "schedule" ]; then
+            echo "✅ schedule event — skipping time check."
+            exit 0
+          fi
+
+          # force_run=true이면 통과
           if [ "$FORCE" = "true" ]; then
             echo "✅ force_run=true — skipping time check."
             exit 0
           fi
+
+          # workflow_dispatch: 13:00 UTC (= 22:00 KST, 잘못된 자동 트리거) 차단
           HOUR=$(date -u +%H)
-          echo "Current UTC hour: $HOUR"
-          # Allow: 19:00~01:59 UTC (= Wed 04:00~10:59 KST) — covers 22:00 UTC = 07:00 KST
-          # Block: 02:00~18:59 UTC — this includes the rogue 13:00 UTC trigger (= 22:00 KST Tue)
+          echo "Current UTC hour: $HOUR (event: $EVENT)"
           if [ "$HOUR" -ge 2 ] && [ "$HOUR" -lt 19 ]; then
-            echo "⛔ Blocked: UTC ${HOUR}:xx is outside the 07:00 KST send window."
-            echo "Expected trigger time: 22:00 UTC (07:00 KST). To override, set force_run=true."
+            echo "⛔ Blocked: workflow_dispatch at UTC ${HOUR}:xx — not a scheduled send time."
+            echo "To override, set force_run=true."
             exit 1
           fi
-          echo "✅ Time check passed: UTC ${HOUR}:xx — proceeding with newsletter pipeline."
+          echo "✅ Time check passed."
 
       - name: Checkout repository
         uses: actions/checkout@v4
