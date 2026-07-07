@@ -63,41 +63,73 @@ VEHICLE_REG: dict[str, dict] = {
 }
 
 
-# frankfurter.app (ECB) 지원 통화만 API 조회, 나머지는 정적 참고값 사용
+# frankfurter.app (ECB) 지원 통화만 1차 API 조회 대상, 나머지는 open.er-api.com으로 조회
 _FRANKFURTER_SUPPORTED = {"KRW", "CNY", "JPY", "INR", "PHP", "THB"}
 
-# 정적 참고 환율 (대비 USD, 약 2025년 기준 — 실제 운영 시 주기적 확인 권장)
-_STATIC_RATES: dict[str, float] = {
+# SAR: 사우디 리얄은 법으로 USD에 고정된 페그 환율이라 API 대신 고정값 사용
+_PEGGED_RATES: dict[str, float] = {
     "USD": 1.0,
-    "RUB": 90.0,    # 러시아 루블 (제재로 ECB 미지원)
+    "SAR": 3.75,
+}
+
+# 모든 API 조회가 실패했을 때만 쓰는 최후 fallback (대략치, 주기적 확인 권장)
+_STATIC_FALLBACK_RATES: dict[str, float] = {
+    "RUB": 90.0,    # 러시아 루블 (frankfurter 미지원)
     "VND": 25400.0, # 베트남 동
     "PKR": 278.0,   # 파키스탄 루피
-    "SAR": 3.75,    # 사우디 리얄 (USD 고정 환율)
 }
 
 
+def _fetch_open_er_api_sync(currencies: list[str]) -> dict[str, float]:
+    """Fetch USD-based rates from open.er-api.com (free, no key, covers RUB/VND/PKR etc.)."""
+    if not currencies:
+        return {}
+    url = "https://open.er-api.com/v6/latest/USD"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "SK-Newsletter/1.0"})
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read())
+            if data.get("result") != "success":
+                return {}
+            rates = data.get("rates", {})
+            return {c: rates[c] for c in currencies if c in rates}
+    except Exception as e:
+        logger.warning(f"open.er-api.com fetch failed: {e}")
+        return {}
+
+
 def _fetch_exchange_rates_sync(currencies: list[str]) -> dict[str, float]:
-    """Fetch USD-based rates. Uses frankfurter.app for ECB currencies, static for others."""
-    result: dict[str, float] = {"USD": 1.0}
+    """Fetch USD-based rates: pegged currencies use a fixed value, frankfurter.app
+    covers ECB-tracked currencies, open.er-api.com covers the rest (incl. RUB),
+    and the static table is only a last-resort fallback if both APIs fail."""
+    result: dict[str, float] = {}
 
-    # Apply static values first
     for c in currencies:
-        if c in _STATIC_RATES:
-            result[c] = _STATIC_RATES[c]
+        if c in _PEGGED_RATES:
+            result[c] = _PEGGED_RATES[c]
+    result.setdefault("USD", 1.0)
 
-    # Fetch live rates for supported currencies
-    api_targets = [c for c in currencies if c in _FRANKFURTER_SUPPORTED]
-    if api_targets:
-        to_param = ",".join(api_targets)
+    frankfurter_targets = [c for c in currencies if c in _FRANKFURTER_SUPPORTED]
+    if frankfurter_targets:
+        to_param = ",".join(frankfurter_targets)
         url = f"https://api.frankfurter.app/latest?from=USD&to={to_param}"
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "SK-Newsletter/1.0"})
             with urllib.request.urlopen(req, timeout=8) as resp:
                 data = json.loads(resp.read())
-                live = data.get("rates", {})
-                result.update(live)
+                result.update(data.get("rates", {}))
         except Exception as e:
             logger.warning(f"frankfurter.app fetch failed: {e}")
+
+    remaining = [c for c in currencies if c not in result]
+    if remaining:
+        result.update(_fetch_open_er_api_sync(remaining))
+
+    # Last-resort static fallback for anything neither API returned
+    for c in currencies:
+        if c not in result and c in _STATIC_FALLBACK_RATES:
+            logger.warning(f"Using static fallback rate for {c} — live APIs unavailable")
+            result[c] = _STATIC_FALLBACK_RATES[c]
 
     return result
 
