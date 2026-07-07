@@ -55,7 +55,7 @@ interface Settings {
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [frequency, setFrequency] = useState("weekly");
+  const frequency = "weekly";
   const [dayOfWeek, setDayOfWeek] = useState("Thursday");
   const [time, setTime] = useState("07:00");
   const [activeCountries, setActiveCountries] = useState<string[]>([]);
@@ -99,7 +99,6 @@ export default function SettingsPage() {
 
   function applySettings(data: Settings) {
     setSettings(data);
-    setFrequency(data.schedule.frequency);
     setDayOfWeek(data.schedule.day_of_week);
     setTime(data.schedule.time);
     setActiveCountries(data.schedule.countries);
@@ -324,12 +323,9 @@ export default function SettingsPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm text-gray-400 mb-2">Frequency</label>
-            <select value={frequency} onChange={(e) => setFrequency(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white">
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
-              <option value="monthly">Monthly</option>
-            </select>
+            <div className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-gray-300">
+              Weekly
+            </div>
           </div>
           <div>
             <label className="block text-sm text-gray-400 mb-2">Day of Week</label>
