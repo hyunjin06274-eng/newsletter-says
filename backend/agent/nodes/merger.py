@@ -35,8 +35,16 @@ def dedupe_articles(articles: list[Article]) -> list[Article]:
     return list(seen_urls.values())
 
 
+def _normalize_url(url: str) -> str:
+    parsed = urlparse(url)
+    return f"{parsed.netloc}{parsed.path}".rstrip("/").lower()
+
+
 async def merge_and_dedupe(state: NewsletterState) -> dict:
-    """Merge domain results and remove duplicates per country."""
+    """Merge domain results, remove duplicates per country, then remove any article
+    that was independently collected for more than one country (same URL) — keeping
+    it only in the first country (by iteration order) so the same story doesn't get
+    scored/published redundantly across multiple country newsletters."""
     raw_articles = state.get("raw_articles", {})
     merged: dict[str, list[Article]] = {}
 
@@ -46,6 +54,24 @@ async def merge_and_dedupe(state: NewsletterState) -> dict:
         merged[country] = deduped
         logger.info(f"[{country}] Merged: {before} -> {len(deduped)} (removed {before - len(deduped)} dupes)")
         print(f"[{country}] Merged: {before} -> {len(deduped)} (removed {before - len(deduped)} dupes)", flush=True)
+
+    seen_cross_country: set[str] = set()
+    for country in merged:
+        kept = []
+        removed = 0
+        for article in merged[country]:
+            url = article.get("url", "")
+            normalized = _normalize_url(url) if url else ""
+            if normalized and normalized in seen_cross_country:
+                removed += 1
+                continue
+            if normalized:
+                seen_cross_country.add(normalized)
+            kept.append(article)
+        if removed:
+            logger.info(f"[{country}] Cross-country dedup: removed {removed} article(s) already used by an earlier country")
+            print(f"[{country}] Cross-country dedup: removed {removed} article(s) already used by an earlier country", flush=True)
+        merged[country] = kept
 
     return {
         "merged_articles": merged,

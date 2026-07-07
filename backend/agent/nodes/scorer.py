@@ -494,17 +494,21 @@ async def score_articles(state: NewsletterState) -> dict:
                 s = scored_article.get("score", 0)
                 sc = scored_article.get("score_country", 0)
                 scope = scored_article.get("scope", "local")
-                # 총점 ≥ min_total_score AND 국가 연관성 ≥ min_country_score AND scope≠global
-                if s >= min_total_score and sc >= min_country_score and scope != "global":
+                if scope == "global":
+                    # Global articles are never country-specific by definition — judge them on
+                    # sales+action impact only (20-pt scale) instead of penalizing low score_country.
+                    global_relevance = scored_article.get("score_sales", 0) + scored_article.get("score_action", 0)
+                    global_bar = round(min_total_score * 2 / 3)
+                    accept = global_relevance >= global_bar
+                    reason = f"global relevance={global_relevance}<{global_bar}"
+                else:
+                    accept = s >= min_total_score and sc >= min_country_score
+                    reason = f"score={s}<{min_total_score}" if s < min_total_score else f"country={sc}<{min_country_score}"
+
+                if accept:
                     scored_articles.append(scored_article)
                     print(f"  📊 [{country}] -> score={s} (country={sc}) ✓", flush=True)
                 else:
-                    if scope == "global":
-                        reason = "global — 전면 차단"
-                    elif s < min_total_score:
-                        reason = f"score={s}<{min_total_score}"
-                    else:
-                        reason = f"country={sc}<{min_country_score}"
                     print(f"  📊 [{country}] -> score={s} (country={sc}) ✗ ({reason})", flush=True)
         else:
             for a in to_score:
