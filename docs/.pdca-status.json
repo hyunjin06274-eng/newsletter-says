@@ -1,9 +1,81 @@
 {
   "version": "2.0",
-  "lastUpdated": "2026-04-07T11:18:38.035Z",
-  "activeFeatures": [],
-  "primaryFeature": null,
-  "features": {},
+  "lastUpdated": "2026-04-14T08:04:45.664Z",
+  "activeFeatures": [
+    "core",
+    "api",
+    "nodes",
+    "frontend",
+    "settings"
+  ],
+  "primaryFeature": "core",
+  "features": {
+    "core": {
+      "phase": "do",
+      "phaseNumber": 3,
+      "matchRate": null,
+      "iterationCount": 0,
+      "requirements": [],
+      "documents": {},
+      "timestamps": {
+        "started": "2026-04-13T10:38:50.631Z",
+        "lastUpdated": "2026-04-13T10:38:50.631Z"
+      },
+      "lastFile": "/Users/summer/Desktop/always/SK 프로젝트/newsletter-saas/backend/core/config.py"
+    },
+    "api": {
+      "phase": "do",
+      "phaseNumber": 3,
+      "matchRate": null,
+      "iterationCount": 0,
+      "requirements": [],
+      "documents": {},
+      "timestamps": {
+        "started": "2026-04-13T10:38:53.392Z",
+        "lastUpdated": "2026-04-13T10:38:54.105Z"
+      },
+      "lastFile": "/Users/summer/Desktop/always/SK 프로젝트/newsletter-saas/backend/api/schemas.py"
+    },
+    "nodes": {
+      "phase": "do",
+      "phaseNumber": 3,
+      "matchRate": null,
+      "iterationCount": 0,
+      "requirements": [],
+      "documents": {},
+      "timestamps": {
+        "started": "2026-04-13T10:39:05.316Z",
+        "lastUpdated": "2026-04-14T08:04:45.664Z"
+      },
+      "lastFile": "/Users/summer/Desktop/always/SK 프로젝트/newsletter-saas/backend/agent/nodes/enricher.py"
+    },
+    "frontend": {
+      "phase": "do",
+      "phaseNumber": 3,
+      "matchRate": null,
+      "iterationCount": 0,
+      "requirements": [],
+      "documents": {},
+      "timestamps": {
+        "started": "2026-04-13T10:40:00.386Z",
+        "lastUpdated": "2026-04-13T10:40:00.386Z"
+      },
+      "lastFile": "/Users/summer/Desktop/always/SK 프로젝트/newsletter-saas/frontend/app/page.tsx"
+    },
+    "settings": {
+      "phase": "do",
+      "phaseNumber": 3,
+      "matchRate": null,
+      "iterationCount": 0,
+      "requirements": [],
+      "documents": {},
+      "timestamps": {
+        "started": "2026-04-13T10:40:05.233Z",
+        "lastUpdated": "2026-04-13T10:40:05.233Z"
+      },
+      "lastFile": "/Users/summer/Desktop/always/SK 프로젝트/newsletter-saas/frontend/app/settings/page.tsx"
+    }
+  },
   "pipeline": {
     "currentPhase": 1,
     "level": "Dynamic",
@@ -12,7 +84,206 @@
   "session": {
     "startedAt": "2026-04-07T11:18:38.035Z",
     "onboardingCompleted": false,
-    "lastActivity": "2026-04-07T11:18:38.035Z"
+    "lastActivity": "2026-04-14T08:04:45.664Z"
   },
-  "history": []
+  "history": [
+    {
+      "timestamp": "2026-04-13T10:38:50.631Z",
+      "feature": "core",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T10:38:53.392Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T10:38:54.105Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T10:39:05.316Z",
+      "feature": "nodes",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T10:39:07.215Z",
+      "feature": "nodes",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T10:39:08.847Z",
+      "feature": "nodes",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T10:39:15.449Z",
+      "feature": "nodes",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T10:39:18.245Z",
+      "feature": "nodes",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T10:39:33.367Z",
+      "feature": "nodes",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T10:39:41.035Z",
+      "feature": "nodes",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T10:39:50.439Z",
+      "feature": "nodes",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T10:40:00.386Z",
+      "feature": "frontend",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T10:40:05.233Z",
+      "feature": "settings",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T10:40:32.030Z",
+      "feature": "nodes",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T10:40:37.635Z",
+      "feature": "nodes",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T10:40:43.991Z",
+      "feature": "nodes",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T10:40:49.240Z",
+      "feature": "nodes",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T10:41:01.194Z",
+      "feature": "nodes",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T10:41:13.520Z",
+      "feature": "nodes",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T10:41:21.494Z",
+      "feature": "nodes",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T10:41:30.339Z",
+      "feature": "nodes",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T10:41:36.831Z",
+      "feature": "nodes",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-14T07:58:37.554Z",
+      "feature": "nodes",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-14T07:58:49.863Z",
+      "feature": "nodes",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-14T07:59:38.803Z",
+      "feature": "nodes",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-14T08:00:03.795Z",
+      "feature": "nodes",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-14T08:00:16.830Z",
+      "feature": "nodes",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-14T08:00:29.662Z",
+      "feature": "nodes",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-14T08:00:54.871Z",
+      "feature": "nodes",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-14T08:01:04.247Z",
+      "feature": "nodes",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-14T08:04:24.044Z",
+      "feature": "nodes",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-14T08:04:37.385Z",
+      "feature": "nodes",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-14T08:04:45.664Z",
+      "feature": "nodes",
+      "phase": "do",
+      "action": "updated"
+    }
+  ]
 }

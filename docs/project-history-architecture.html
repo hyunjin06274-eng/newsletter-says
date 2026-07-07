@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SK엔무브 뉴스레터 SaaS — 프로젝트 히스토리 & 아키텍처</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', -apple-system, sans-serif; background: #0F172A; color: #E2E8F0; line-height: 1.7; }
+  .container { max-width: 960px; margin: 0 auto; padding: 40px 24px; }
+  h1 { font-size: 32px; font-weight: 800; color: #fff; margin-bottom: 8px; }
+  h2 { font-size: 22px; font-weight: 700; color: #60A5FA; margin: 48px 0 16px; border-bottom: 2px solid #1E3A5F; padding-bottom: 8px; }
+  h3 { font-size: 17px; font-weight: 700; color: #93C5FD; margin: 28px 0 12px; }
+  p { margin-bottom: 12px; color: #CBD5E1; }
+  .subtitle { color: #64748B; font-size: 14px; margin-bottom: 32px; }
+  .badge { display: inline-block; background: #E5191E; color: #fff; font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 4px; margin-bottom: 16px; letter-spacing: 1px; }
+  .card { background: #1E293B; border: 1px solid #334155; border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+  .card-header { font-size: 16px; font-weight: 700; color: #F1F5F9; margin-bottom: 12px; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px; }
+  th { background: #1E3A5F; color: #93C5FD; text-align: left; padding: 10px 12px; font-weight: 600; }
+  td { padding: 8px 12px; border-bottom: 1px solid #1E293B; color: #CBD5E1; }
+  tr:hover td { background: #1E293B; }
+  code { background: #0F172A; color: #7DD3FC; padding: 2px 6px; border-radius: 4px; font-size: 13px; font-family: 'SF Mono', 'Fira Code', monospace; }
+  pre { background: #0F172A; border: 1px solid #334155; border-radius: 8px; padding: 16px; overflow-x: auto; margin: 12px 0; font-size: 12px; line-height: 1.6; color: #94A3B8; }
+  .flow-box { background: #0F172A; border: 1px solid #334155; border-radius: 8px; padding: 20px; margin: 16px 0; font-family: monospace; font-size: 13px; white-space: pre; line-height: 1.5; color: #7DD3FC; }
+  .phase { display: inline-block; background: #1E3A5F; color: #7DD3FC; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; margin: 2px; }
+  .phase-active { background: #2563EB; color: #fff; }
+  .timeline { border-left: 3px solid #334155; padding-left: 24px; margin: 16px 0; }
+  .timeline-item { margin-bottom: 16px; position: relative; }
+  .timeline-item::before { content: ''; position: absolute; left: -30px; top: 6px; width: 12px; height: 12px; border-radius: 50%; background: #3B82F6; }
+  .timeline-item.milestone::before { background: #E5191E; width: 14px; height: 14px; left: -31px; }
+  .timeline-date { color: #64748B; font-size: 12px; font-weight: 600; }
+  .timeline-title { color: #F1F5F9; font-weight: 600; }
+  .timeline-desc { color: #94A3B8; font-size: 13px; }
+  .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 16px 0; }
+  .stat-box { background: #1E293B; border: 1px solid #334155; border-radius: 8px; padding: 16px; text-align: center; }
+  .stat-num { font-size: 28px; font-weight: 800; color: #60A5FA; }
+  .stat-label { font-size: 11px; color: #64748B; margin-top: 4px; }
+  .tech-tag { display: inline-block; background: #1E293B; border: 1px solid #334155; color: #93C5FD; padding: 3px 10px; border-radius: 12px; font-size: 12px; margin: 2px; }
+  .section-divider { height: 1px; background: linear-gradient(90deg, transparent, #334155, transparent); margin: 40px 0; }
+  @media (max-width: 640px) { .stat-grid { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- Header -->
+<div class="badge">SK enmove</div>
+<h1>뉴스레터 SaaS 프로젝트</h1>
+<p class="subtitle">프로젝트 히스토리 & 시스템 아키텍처 문서 | 2026.04.01 ~ 04.12</p>
+
+<!-- Stats -->
+<div class="stat-grid">
+  <div class="stat-box"><div class="stat-num">53</div><div class="stat-label">Git Commits</div></div>
+  <div class="stat-box"><div class="stat-num">6</div><div class="stat-label">Target Countries</div></div>
+  <div class="stat-box"><div class="stat-num">9</div><div class="stat-label">Pipeline Nodes</div></div>
+  <div class="stat-box"><div class="stat-num">13</div><div class="stat-label">Recipients</div></div>
+</div>
+
+<!-- ================================================================== -->
+<h2>1. 프로젝트 개요</h2>
+
+<div class="card">
+  <div class="card-header">무엇을 만들었나?</div>
+  <p>SK엔무브 마케터·영업전략 담당자를 위한 <strong>6개국 윤활유 시장 인텔리전스(MI) 뉴스레터</strong>를 자동으로 수집·분석·생성·발송하는 클라우드 SaaS 시스템.</p>
+  <p>기존 로컬 Python 스크립트 파이프라인을 <strong>맥북 없이도 클라우드에서 자동 실행</strong>되는 웹 서비스로 전환했습니다.</p>
+  <p><strong>대상 국가:</strong> 🇰🇷 한국 · 🇷🇺 러시아 · 🇻🇳 베트남 · 🇹🇭 태국 · 🇵🇭 필리핀 · 🇵🇰 파키스탄</p>
+</div>
+
+<!-- ================================================================== -->
+<h2>2. 시스템 아키텍처</h2>
+
+<div class="flow-box">┌──────────────────────────────────────────────────────┐
+│  👤 사용자 (브라우저)                                    │
+│  https://frontend-gamma-eight-32.vercel.app            │
+└───────────────────────┬──────────────────────────────┘
+                        │ Direct API Calls
+                        ▼
+┌──────────────────────────────────────────────────────┐
+│  🖥️ API 서버 (Render.com, 512MB)                      │
+│  https://newsletter-says.onrender.com                 │
+│  FastAPI — Settings, Runs, Newsletters CRUD           │
+│  GitHub Actions 트리거 (파이프라인 실행 위임)              │
+└───────────────────────┬──────────────────────────────┘
+          │                          │
+          ▼                          ▼
+┌─────────────────┐    ┌────────────────────────────────┐
+│  🗄️ Supabase     │    │  ⚙️ GitHub Actions (Ubuntu)     │
+│  PostgreSQL      │    │  LangGraph 파이프라인 실행         │
+│  - runs          │◄───│  - 뉴스 수집 (Google News RSS)    │
+│  - settings      │    │  - LLM 스코어링 (Claude Sonnet)   │
+│  - run_logs      │    │  - HTML 뉴스레터 생성              │
+│                  │    │  - Gmail 발송                     │
+└─────────────────┘    │  - Supabase 상태 업데이트           │
+                        └────────────────────────────────┘
+                                     │
+                                     ▼
+                        ┌────────────────────────────────┐
+                        │  📧 Gmail API (OAuth2)           │
+                        │  13명 수신자에게 국가별 발송         │
+                        └────────────────────────────────┘</div>
+
+<h3>왜 이런 구조인가?</h3>
+<div class="card">
+  <table>
+    <tr><th>결정</th><th>이유</th></tr>
+    <tr><td>파이프라인을 GitHub Actions에서 실행</td><td>Render 무료 512MB RAM 제한 → LangGraph+Anthropic 로드 시 OOM 크래시</td></tr>
+    <tr><td>프론트엔드에서 Render API 직접 호출</td><td>Vercel 서버리스 프록시 10초 타임아웃 → Render cold start(50초) 커버 불가</td></tr>
+    <tr><td>supabase-py 대신 REST API 직접 호출</td><td>supabase-py 패키지 빌드 실패 + 메모리 초과 문제</td></tr>
+    <tr><td>Gemini → Claude Haiku로 키워드 생성</td><td>Gemini 모델 deprecated 반복, API 호환성 불안정</td></tr>
+    <tr><td>현지어 RSS 우선 검색</td><td>영어 검색 시 글로벌 기사만 나와서 국가 연관성 떨어짐</td></tr>
+    <tr><td>cron-job.org로 이중 스케줄링</td><td>GitHub Actions cron 정확성 낮음 (신규 repo 첫 실행 누락)</td></tr>
+  </table>
+</div>
+
+<!-- ================================================================== -->
+<h2>3. 파이프라인 흐름 (9단계)</h2>
+
+<div style="margin: 16px 0;">
+  <span class="phase">0.5 키워드</span> →
+  <span class="phase">1 수집</span> →
+  <span class="phase">1.5 병합</span> →
+  <span class="phase">2 스코어링</span> →
+  <span class="phase">2.5 번역</span> →
+  <span class="phase">2.7 그룹핑</span> →
+  <span class="phase">3 HTML생성</span> →
+  <span class="phase phase-active">3.5 품질검수</span> ⇄
+  <span class="phase">4 발송</span>
+</div>
+
+<div class="card">
+  <table>
+    <tr><th>Phase</th><th>노드</th><th>역할</th><th>LLM</th></tr>
+    <tr><td>0.5</td><td>keyword_generator</td><td>국가별 12개 검색 키워드 생성 (경쟁사4 + 전방산업4 + 규제2 + 현지어2)</td><td>Claude Haiku</td></tr>
+    <tr><td>1</td><td>collector</td><td>Google News RSS 수집 (현지어 우선, 영어 보조)</td><td>-</td></tr>
+    <tr><td>1.5</td><td>merger</td><td>URL 기준 중복 제거 (경쟁사 > 윤활유 > 산업 > 거시)</td><td>-</td></tr>
+    <tr><td>2</td><td>scorer</td><td>30점 스코어링 (판매연관10 + 국가특수10 + 실행가능10)</td><td>Claude Sonnet 4</td></tr>
+    <tr><td>2.5</td><td>enricher</td><td>한국어 제목 번역 + 4-5문장 상세 요약 + URL 유효성 검증</td><td>Claude Sonnet 4</td></tr>
+    <tr><td>2.7</td><td>grouper</td><td>유사 기사 그룹화 (유사도 0.45 이상 → 대표 기사 선정)</td><td>-</td></tr>
+    <tr><td>3</td><td>writer</td><td>HTML 뉴스레터 생성 (핵심 인사이트 + 섹터 뉴스 + 전략 제언)</td><td>Claude Sonnet 4</td></tr>
+    <tr><td>3.5</td><td>auditor</td><td>품질 검수 (6개 기준, 미달 시 writer로 재전송, 최대 3회)</td><td>Claude Sonnet 4</td></tr>
+    <tr><td>4</td><td>sender</td><td>Gmail API로 국가별 발송 (Supabase에서 수신자 로드)</td><td>-</td></tr>
+  </table>
+</div>
+
+<h3>30점 스코어링 체계</h3>
+<div class="card">
+  <table>
+    <tr><th>차원</th><th>배점</th><th>기준</th></tr>
+    <tr><td><strong>Sales Relevance</strong></td><td>0-10</td><td>10=경쟁사 신제품, 8=규제 변경, 6=차량 판매 데이터, 4=기유 가격, 0=무관</td></tr>
+    <tr><td><strong>Country Specificity</strong></td><td>0-10</td><td>10=해당 국가 전용, 7=주로 해당 국가, 4=지역(아시아/유럽), 1=순수 글로벌, 0=다른 국가</td></tr>
+    <tr><td><strong>Actionability</strong></td><td>0-10</td><td>10=즉시 대응 필요, 7=분기 계획 반영, 4=참고 정보, 2=배경 지식, 0=무의미</td></tr>
+  </table>
+  <p style="margin-top:12px;color:#94A3B8;font-size:13px;">총점 10점 미만 → 뉴스레터에서 제외 | 24점 이상 → ★★★★★ HOT 태그 표시</p>
+</div>
+
+<!-- ================================================================== -->
+<h2>4. 기술 스택</h2>
+
+<div class="card">
+  <div class="card-header">Backend</div>
+  <span class="tech-tag">FastAPI</span>
+  <span class="tech-tag">LangGraph</span>
+  <span class="tech-tag">Claude Sonnet 4</span>
+  <span class="tech-tag">Claude Haiku</span>
+  <span class="tech-tag">Feedparser</span>
+  <span class="tech-tag">Gmail API</span>
+  <span class="tech-tag">Python 3.12</span>
+</div>
+<div class="card">
+  <div class="card-header">Frontend</div>
+  <span class="tech-tag">Next.js 15</span>
+  <span class="tech-tag">React 19</span>
+  <span class="tech-tag">Tailwind CSS 4</span>
+  <span class="tech-tag">TypeScript</span>
+  <span class="tech-tag">Lucide Icons</span>
+</div>
+<div class="card">
+  <div class="card-header">Infrastructure</div>
+  <span class="tech-tag">Render.com (API)</span>
+  <span class="tech-tag">Vercel (Frontend)</span>
+  <span class="tech-tag">Supabase (PostgreSQL)</span>
+  <span class="tech-tag">GitHub Actions (CI/CD)</span>
+  <span class="tech-tag">cron-job.org (Scheduler)</span>
+</div>
+
+<!-- ================================================================== -->
+<h2>5. 주요 URL & 접속 정보</h2>
+
+<div class="card">
+  <table>
+    <tr><th>서비스</th><th>URL</th><th>용도</th></tr>
+    <tr><td>Dashboard</td><td><code>frontend-gamma-eight-32.vercel.app</code></td><td>대시보드, 설정, 실행</td></tr>
+    <tr><td>API Server</td><td><code>newsletter-says.onrender.com</code></td><td>REST API, 헬스체크</td></tr>
+    <tr><td>GitHub Repo</td><td><code>github.com/hyunjin06274-eng/newsletter-says</code></td><td>소스코드, CI/CD</td></tr>
+    <tr><td>Supabase</td><td><code>qndliypxehqaveeuzwvg.supabase.co</code></td><td>DB 관리</td></tr>
+    <tr><td>API Docs</td><td><code>newsletter-says.onrender.com/docs</code></td><td>Swagger UI</td></tr>
+  </table>
+</div>
+
+<!-- ================================================================== -->
+<h2>6. 개발 히스토리 (4/1 ~ 4/12)</h2>
+
+<div class="timeline">
+
+  <div class="timeline-item milestone">
+    <div class="timeline-date">4월 1일</div>
+    <div class="timeline-title">프로젝트 시작 — PROMPT.md, LangGraph 스캐폴드</div>
+    <div class="timeline-desc">newsletter-saas 디렉토리 생성, git init, 9개 노드 State 정의</div>
+  </div>
+
+  <div class="timeline-item milestone">
+    <div class="timeline-date">4월 1일</div>
+    <div class="timeline-title">전체 코드 생성 — Backend + Frontend + GitHub Actions</div>
+    <div class="timeline-desc">LangGraph 워크플로우, FastAPI 서버, Next.js 대시보드, 뉴스레터 HTML 템플릿 완성</div>
+  </div>
+
+  <div class="timeline-item">
+    <div class="timeline-date">4월 2-3일</div>
+    <div class="timeline-title">LLM 동적 쿼리, 스코어링 강화, DB 저장</div>
+    <div class="timeline-desc">Anthropic Claude로 검색 쿼리 동적 생성, 윤활유 연관성 기준 세분화</div>
+  </div>
+
+  <div class="timeline-item milestone">
+    <div class="timeline-date">4월 4일</div>
+    <div class="timeline-title">프로 수준 HTML 템플릿 + 한국어 번역 시스템</div>
+    <div class="timeline-desc">KPI 대시보드 바, 이모지 인사이트, 스코어 배지, 섹터 색상, 원문보기 링크</div>
+  </div>
+
+  <div class="timeline-item">
+    <div class="timeline-date">4월 5일</div>
+    <div class="timeline-title">6개국 뉴스레터 생성 + 비주얼 업그레이드</div>
+    <div class="timeline-desc">HOT 태그, 좌측 보더, 우선순위 전략 제언, 날짜 포맷 정리</div>
+  </div>
+
+  <div class="timeline-item milestone">
+    <div class="timeline-date">4월 6일</div>
+    <div class="timeline-title">GitHub Push + Vercel 배포 + 자동화 완성</div>
+    <div class="timeline-desc">GitHub repo 생성, Vercel 프론트엔드 배포, Gmail 토큰 GitHub Secret 등록</div>
+  </div>
+
+  <div class="timeline-item">
+    <div class="timeline-date">4월 7일</div>
+    <div class="timeline-title">Settings 영구 저장 + 버튼 애니메이션</div>
+    <div class="timeline-desc">localStorage+API 듀얼 저장, Running 스피너, 국가별 수신자 UI</div>
+  </div>
+
+  <div class="timeline-item milestone">
+    <div class="timeline-date">4월 7일</div>
+    <div class="timeline-title">Render.com 백엔드 배포</div>
+    <div class="timeline-desc">FastAPI를 Render에 배포, Vercel→Render API 직접 연결, CORS 설정</div>
+  </div>
+
+  <div class="timeline-item">
+    <div class="timeline-date">4월 8일</div>
+    <div class="timeline-title">Supabase 전환 + OOM 해결</div>
+    <div class="timeline-desc">SQLite→Supabase PostgreSQL, Render 512MB OOM→파이프라인을 GitHub Actions로 이전</div>
+  </div>
+
+  <div class="timeline-item milestone">
+    <div class="timeline-date">4월 8일</div>
+    <div class="timeline-title">첫 이메일 발송 성공</div>
+    <div class="timeline-desc">GitHub Actions에서 LangGraph 파이프라인 실행 → Gmail API로 뉴스레터 발송 확인</div>
+  </div>
+
+  <div class="timeline-item">
+    <div class="timeline-date">4월 9-10일</div>
+    <div class="timeline-title">국가 필터 강화 + Gemini→Haiku 전환</div>
+    <div class="timeline-desc">한국 뉴스레터에 필리핀 기사 혼입 문제 해결, local/global/other_country 분류</div>
+  </div>
+
+  <div class="timeline-item">
+    <div class="timeline-date">4월 11일</div>
+    <div class="timeline-title">현지어 우선 검색 + 상세 로그</div>
+    <div class="timeline-desc">현지 언어 Google News RSS 우선, 개별 기사 스코어링 진행률 로그</div>
+  </div>
+
+  <div class="timeline-item milestone">
+    <div class="timeline-date">4월 12일</div>
+    <div class="timeline-title">30점 스코어링 + 6개국 프로덕션 발송</div>
+    <div class="timeline-desc">Sales(10)+Country(10)+Action(10)=30점 체계, 13명 수신자, 수요일 07:00 KST 자동화</div>
+  </div>
+
+</div>
+
+<!-- ================================================================== -->
+<h2>7. 파일 구조</h2>
+
+<pre>
+newsletter-saas/
+├── backend/
+│   ├── main.py                      # FastAPI 엔트리포인트
+│   ├── requirements.txt             # 의존성 (경량, Render용)
+│   ├── agent/
+│   │   ├── graph.py                 # LangGraph 워크플로우 정의
+│   │   ├── state.py                 # State TypedDict
+│   │   └── nodes/
+│   │       ├── keyword_generator.py # Phase 0.5 — Claude Haiku 키워드
+│   │       ├── collector.py         # Phase 1 — Google News RSS 수집
+│   │       ├── merger.py            # Phase 1.5 — 중복 제거
+│   │       ├── scorer.py            # Phase 2 — 30점 스코어링
+│   │       ├── enricher.py          # Phase 2.5 — 한국어 번역+요약
+│   │       ├── grouper.py           # Phase 2.7 — 유사 기사 그룹화
+│   │       ├── writer.py            # Phase 3 — HTML 뉴스레터 생성
+│   │       ├── auditor.py           # Phase 3.5 — 품질 검수 루프
+│   │       └── sender.py            # Phase 4 — Gmail 발송
+│   ├── api/
+│   │   ├── routes.py                # REST API 엔드포인트
+│   │   └── schemas.py               # Pydantic 모델
+│   └── core/
+│       ├── config.py                # 환경변수 설정
+│       └── database.py              # Supabase REST 클라이언트
+├── frontend/
+│   ├── app/
+│   │   ├── page.tsx                 # 대시보드
+│   │   ├── settings/page.tsx        # 설정 (스케줄, 수신자)
+│   │   ├── runs/page.tsx            # 실행 이력
+│   │   ├── runs/[id]/page.tsx       # 실행 상세 + 실시간 진행
+│   │   ├── newsletters/[id]/page.tsx # 뉴스레터 미리보기
+│   │   └── api-client.ts           # Render API 직접 호출
+│   ├── package.json
+│   ├── next.config.ts
+│   └── tailwind.config.ts
+├── .github/workflows/
+│   ├── schedule.yml                 # 뉴스레터 파이프라인 (cron + dispatch)
+│   └── keep-alive.yml               # Render 14분 ping
+├── supabase_schema.sql              # DB 테이블 정의
+├── render.yaml                      # Render 배포 설정
+├── vercel.json                      # Vercel 배포 설정
+├── Procfile                         # Render 실행 명령
+└── scripts/
+    └── export_gmail_token.sh        # Gmail 토큰 GitHub Secret 등록
+</pre>
+
+<!-- ================================================================== -->
+<h2>8. 자동화 스케줄</h2>
+
+<div class="card">
+  <table>
+    <tr><th>스케줄</th><th>동작</th><th>트리거</th></tr>
+    <tr><td><strong>매주 수요일 07:00 KST</strong></td><td>6개국 뉴스레터 생성 + 13명 발송</td><td>cron-job.org → GitHub Actions dispatch</td></tr>
+    <tr><td>매 5분</td><td>Render 서버 ping (sleep 방지)</td><td>cron-job.org → /health</td></tr>
+    <tr><td>매 14분</td><td>Render 서버 ping (백업)</td><td>GitHub Actions keep-alive.yml</td></tr>
+  </table>
+</div>
+
+<!-- ================================================================== -->
+<h2>9. 수신자 목록</h2>
+
+<div class="card">
+  <div class="card-header">전체 국가 공통 수신자 (13명)</div>
+  <table>
+    <tr><th>#</th><th>이메일</th></tr>
+    <tr><td>1</td><td>jinam@skenmove.com</td></tr>
+    <tr><td>2</td><td>oksh@skenmove.com</td></tr>
+    <tr><td>3</td><td>ks.bang@sk.com</td></tr>
+    <tr><td>4</td><td>isko@skenmove.com</td></tr>
+    <tr><td>5</td><td>eungbok@skenmove.com</td></tr>
+    <tr><td>6</td><td>jsik.yun@skenmove.com</td></tr>
+    <tr><td>7</td><td>skkim2022@skenmove.com</td></tr>
+    <tr><td>8</td><td>happylee@skenmove.com</td></tr>
+    <tr><td>9</td><td>ccrkdh@skenmove.com</td></tr>
+    <tr><td>10</td><td>clarebang@skenmove.com</td></tr>
+    <tr><td>11</td><td>hkha@skenmove.com</td></tr>
+    <tr><td>12</td><td>sk22@skenmove.com</td></tr>
+    <tr><td>13</td><td>hyunjin0627@skenmove.com</td></tr>
+  </table>
+</div>
+
+<!-- ================================================================== -->
+<h2>10. 핵심 의사결정 로그</h2>
+
+<div class="card">
+  <table>
+    <tr><th>날짜</th><th>결정</th><th>이유</th></tr>
+    <tr><td>4/1</td><td>로컬 파이프라인 → 클라우드 SaaS</td><td>맥북 없이 자동 실행 요구</td></tr>
+    <tr><td>4/4</td><td>LLM이 HTML 전체 생성 → 템플릿+LLM 하이브리드</td><td>일관된 디자인 품질 유지</td></tr>
+    <tr><td>4/7</td><td>Vercel 프록시 → Render 직접 호출</td><td>Vercel 10초 타임아웃 문제</td></tr>
+    <tr><td>4/8</td><td>SQLite → Supabase PostgreSQL</td><td>클라우드 영구 저장 + 다중 서비스 접근</td></tr>
+    <tr><td>4/8</td><td>Render에서 파이프라인 실행 → GitHub Actions</td><td>Render 512MB RAM 초과 (OOM)</td></tr>
+    <tr><td>4/10</td><td>Gemini API → Claude Haiku</td><td>Gemini 모델 deprecated 반복, 호환성 불안정</td></tr>
+    <tr><td>4/11</td><td>영어 검색 우선 → 현지어 RSS 우선</td><td>국가 연관성 높은 기사 확보</td></tr>
+    <tr><td>4/12</td><td>5점 스코어링 → 30점 (3차원)</td><td>판매연관+국가특수+실행가능 세분화</td></tr>
+  </table>
+</div>
+
+<div class="section-divider"></div>
+
+<p style="text-align:center;color:#475569;font-size:12px;">
+  SK Enmove Newsletter SaaS — Architecture & History Document<br>
+  Generated: 2026.04.12 | Powered by LangGraph + Claude AI
+</p>
+
+</div>
+</body>
+</html>
