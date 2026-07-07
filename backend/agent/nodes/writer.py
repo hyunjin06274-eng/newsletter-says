@@ -257,6 +257,20 @@ def _build_insights_html(insights: list) -> str:
     return rows
 
 
+def _truncate_at_boundary(text: str, limit: int) -> str:
+    """Truncate text without cutting mid-sentence/mid-word; append … if shortened."""
+    if len(text) <= limit:
+        return text
+    cut = text[:limit]
+    end = max(cut.rfind("다."), cut.rfind("요."), cut.rfind("음."), cut.rfind("."))
+    if end != -1 and end >= limit * 0.5:
+        return cut[: end + 1]
+    space = cut.rfind(" ")
+    if space != -1 and space >= limit * 0.5:
+        return cut[:space].rstrip() + "…"
+    return cut.rstrip() + "…"
+
+
 def _build_recommendations_html(recs: list) -> str:
     rows = ""
     for i, text in enumerate(recs[:4]):
@@ -311,7 +325,7 @@ def build_newsletter_html(
     # Fallback insights
     if not insights:
         top = sorted(articles, key=lambda x: x.get("score", 0), reverse=True)[:5]
-        insights = [a.get("summary_kr", a.get("snippet", a.get("title", "")))[:120] for a in top if a.get("summary_kr") or a.get("snippet")]
+        insights = [_truncate_at_boundary(a.get("summary_kr", a.get("snippet", a.get("title", ""))), 120) for a in top if a.get("summary_kr") or a.get("snippet")]
 
     # Fallback recommendations
     if not recommendations:
@@ -548,6 +562,7 @@ async def write_newsletter(state: NewsletterState) -> dict:
 - [중요] 기사 원문에 명시된 사실만 서술. 추측·평가·전망 등 주관적 해석 금지.
 - [중요] 전문가 발언·인용 포함 시 반드시 출처 명시 (예: "XX사 CEO에 따르면").
 - [중요] agent 자신의 의견이나 추천을 추가하지 말 것.
+- [절대 금지] 기사에서 확인되지 않는 수치·인물·발언·사건은 절대 추측하거나 지어내지 말 것. 해당 항목에 쓸 근거가 부족하면 항목 자체를 생략하거나 "확인 불가"라고 명시할 것 — 그럴듯하게 채워 넣지 말 것.
 
 기사 데이터:
 {articles_summary}

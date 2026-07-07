@@ -77,13 +77,13 @@ Country context: {country_name} lubricant market
 2. Stay strictly within the facts presented in the article. Do NOT add external context or assumptions.
 3. The target country is {country_name}. Frame the impact analysis ONLY for {country_name}'s lubricant market.
 4. If article body is provided, you MUST use specific numbers, model names, company names, and data from it.
-5. NEVER use hedging phrases like "본문 미확보", "확인이 필요하다", "단정하기 어렵다", "정확한 수치는 알 수 없다".
-   - If information is limited, write what you know and end with "상세 내용은 원문 참조" instead.
+5. If information is limited, write only what the article actually states and end with "상세 내용은 원문 참조" — do NOT omit this note just to sound more confident.
 6. Output MUST be in Korean. Do NOT output English text in title_kr or summary_kr.
 7. [날짜 정확성] Do NOT mention or infer the article date. The date will be taken from the original source metadata.
 8. [객관성] summary_kr은 원문에 명시된 사실만 서술. Agent 자신의 의견·평가·전망을 추가하지 말 것.
    - 전문가 발언이나 인용 포함 시 반드시 출처 명시 (예: "XX사 CEO에 따르면").
 9. [이탤릭 금지] 이탤릭체(기울임꼴) 서식 표현을 텍스트에 포함하지 말 것. 일반 텍스트로만 작성.
+10. [절대 금지] 기사 원문/본문에 없는 수치, 인명, 발언, 사건은 절대 추측하거나 지어내지 말 것. 확인할 수 없는 내용이면 "확인 불가" 또는 "정보 없음"이라고 명시하고, 없는 사실을 그럴듯하게 채워 넣지 말 것.
 
 Generate a JSON response with:
 1. "title_kr": Korean title (natural, professional Korean — NOT literal translation. If already Korean, clean it up)
