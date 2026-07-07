@@ -112,10 +112,9 @@ async def send_newsletter(state: NewsletterState) -> dict:
     sender = os.environ.get("GMAIL_SENDER", "skenbizst@gmail.com")
     send_results: dict[str, bool] = {}
 
-    # Load recipients — sources are MERGED (not mutually exclusive):
+    # Load recipients:
     # 1. settings.country_recipients (primary: TO/CC per country, set via UI)
-    # 2. recipients table (legacy: additional global TO, always included)
-    # 3. DEFAULT_RECIPIENTS env var (fallback if both above are empty)
+    # 2. DEFAULT_RECIPIENTS env var (fallback only if settings has none)
     global_to: list[str] = []
     global_cc: list[str] = []
     country_to: dict[str, list[str]] = {}
@@ -151,42 +150,7 @@ async def send_newsletter(state: NewsletterState) -> dict:
         except Exception as e:
             logger.warning(f"Failed to load from settings: {e}")
 
-        # 2순위: recipients 테이블 — global_to에 병합 (기존 데이터 보존)
-        try:
-            resp = _req.get(
-                f"{supabase_url}/rest/v1/recipients?is_active=eq.true&select=email,country",
-                headers=headers,
-                timeout=10,
-            )
-            if resp.ok and resp.json():
-                for row in resp.json():
-                    raw_email = row.get("email", "")
-                    c = row.get("country", "ALL")
-                    # JSON 배열 문자열로 저장된 경우 파싱
-                    if isinstance(raw_email, str) and raw_email.startswith("["):
-                        try:
-                            emails = json.loads(raw_email)
-                        except Exception:
-                            emails = [raw_email]
-                    else:
-                        emails = [raw_email]
-                    for email in emails:
-                        email = str(email).strip()
-                        if not email or "@" not in email:
-                            continue
-                        if c == "ALL":
-                            if email not in global_to:
-                                global_to.append(email)
-                        else:
-                            lst = country_to.setdefault(c, [])
-                            if email not in lst:
-                                lst.append(email)
-                logger.info(f"[recipients table merged] global_to={global_to}, extras={list(country_to.keys())}")
-                print(f"[recipients table merged] global_to={global_to}, extras={list(country_to.keys())}", flush=True)
-        except Exception as e:
-            logger.warning(f"Failed to load from recipients table: {e}")
-
-    # 3순위: DEFAULT_RECIPIENTS 환경변수 (두 소스 모두 비어있을 때만)
+    # 2순위: DEFAULT_RECIPIENTS 환경변수 (settings.country_recipients가 비어있을 때만)
     if not global_to and not country_to:
         env_recip = os.environ.get("DEFAULT_RECIPIENTS", "").split(",")
         global_to = [r.strip() for r in env_recip if r.strip()]
