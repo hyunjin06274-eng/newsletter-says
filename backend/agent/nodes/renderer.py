@@ -601,15 +601,12 @@ def render_web_html(
     today = now.strftime("%Y.%m.%d")
     weekday = WEEKDAYS_KR[now.weekday()]
 
-    # ── Tab bar ───────────────────────────────────────────────────────────────
-    tab_items = ""
+    # ── Dropdown options ──────────────────────────────────────────────────────
+    dropdown_options = ""
     for cc in countries:
         name = COUNTRY_NAMES.get(cc, cc)
         emoji = COUNTRY_EMOJIS.get(cc, "🌐")
-        tab_items += f"""    <button role="tab" id="tab-{cc}" aria-controls="panel-{cc}" aria-selected="false"
-      class="sk-tab" data-country="{cc}"
-      style="display:inline-flex;align-items:center;gap:6px;padding:10px 18px;border:none;border-bottom:3px solid transparent;background:transparent;cursor:pointer;font-family:{FONT};font-size:14px;font-weight:600;color:#555;white-space:nowrap;"
-      onclick="switchTab('{cc}')">{emoji} {name}</button>\n"""
+        dropdown_options += f'      <option value="{cc}">{emoji} {name}</option>\n'
 
     # ── Global section panel ──────────────────────────────────────────────────
     global_articles = global_section.get("articles", [])
@@ -678,10 +675,20 @@ def render_web_html(
     .sk-header {{ background: #e3000f; color: #fff; border-radius: 8px 8px 0 0; padding: 24px 32px; }}
     .sk-label {{ font-size: 10px; letter-spacing: 2px; color: rgba(255,255,255,0.8); margin-bottom: 4px; }}
     .sk-title {{ font-size: 24px; font-weight: bold; line-height: 1.3; }}
-    .sk-tab-bar {{ background: #fff; border-bottom: 1px solid #E0E0E0; overflow-x: auto; white-space: nowrap; display: flex; }}
-    .sk-tab[aria-selected="true"] {{ color: #e3000f !important; border-bottom-color: #e3000f !important; }}
-    .sk-tab:hover {{ color: #e3000f; }}
     .sk-global-panel {{ background: #fff; padding: 28px 32px; border-bottom: 3px solid #E0E0E0; }}
+    .sk-country-picker {{ background: #fff; padding: 16px 32px; border-bottom: 1px solid #E0E0E0; display: flex; align-items: center; gap: 12px; }}
+    .sk-country-picker label {{ font-family: {FONT}; font-size: 13px; font-weight: 600; color: #555; white-space: nowrap; }}
+    .sk-country-select {{
+      flex: 1; max-width: 320px;
+      padding: 9px 14px; font-family: {FONT}; font-size: 14px; font-weight: 600; color: #1A1A1A;
+      border: 2px solid #E0E0E0; border-radius: 6px; background: #FAFAFA;
+      cursor: pointer; appearance: none; -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 12px center;
+      padding-right: 36px;
+      transition: border-color 0.15s;
+    }}
+    .sk-country-select:focus {{ outline: none; border-color: #e3000f; }}
     .sk-panels {{ background: #fff; padding: 28px 32px; border-radius: 0 0 8px 8px; }}
     .sk-panel {{ display: none; }}
     .sk-panel.active {{ display: block; }}
@@ -700,14 +707,17 @@ def render_web_html(
     <div style="font-size:13px;color:rgba(255,255,255,0.8);margin-top:6px;">📅 {today} {weekday}</div>
   </div>
 
-  <!-- Global section (always shown, above tabs) -->
+  <!-- Global section (always shown, above country picker) -->
   <div class="sk-global-panel">
     {global_panel_content}
   </div>
 
-  <!-- Tab bar -->
-  <div class="sk-tab-bar" role="tablist" aria-label="국가별 시장 동향">
-{tab_items}  </div>
+  <!-- Country dropdown picker -->
+  <div class="sk-country-picker">
+    <label for="sk-country-select">🌍 국가 선택</label>
+    <select id="sk-country-select" class="sk-country-select" onchange="switchTab(this.value)" aria-label="국가별 시장 동향 선택">
+{dropdown_options}    </select>
+  </div>
 
   <!-- Country panels -->
   <div class="sk-panels">
@@ -730,33 +740,25 @@ def render_web_html(
 
 <script>
 (function () {{
-  // Read initial country from ?country=XX query param, fallback to default
   var defaultCountry = "{default_country}";
   var params = new URLSearchParams(window.location.search);
   var initialCountry = params.get("country") || defaultCountry;
 
   function switchTab(country) {{
-    // Deactivate all tabs and panels
-    document.querySelectorAll(".sk-tab").forEach(function (t) {{
-      t.setAttribute("aria-selected", "false");
-      t.style.color = "#555";
-      t.style.borderBottomColor = "transparent";
-    }});
+    // Hide all panels
     document.querySelectorAll(".sk-panel").forEach(function (p) {{
       p.style.display = "none";
     }});
 
-    // Activate selected tab and panel
-    var tab = document.getElementById("tab-" + country);
+    // Show selected panel
     var panel = document.getElementById("panel-" + country);
-    if (tab) {{
-      tab.setAttribute("aria-selected", "true");
-      tab.style.color = "#e3000f";
-      tab.style.borderBottomColor = "#e3000f";
-    }}
     if (panel) {{
       panel.style.display = "block";
     }}
+
+    // Sync dropdown value
+    var sel = document.getElementById("sk-country-select");
+    if (sel) {{ sel.value = country; }}
 
     // Update URL without reload
     var url = new URL(window.location);
@@ -764,21 +766,10 @@ def render_web_html(
     history.replaceState(null, "", url);
   }}
 
-  // Keyboard navigation on tab bar
-  document.querySelectorAll(".sk-tab").forEach(function (tab) {{
-    tab.setAttribute("tabindex", "0");
-    tab.addEventListener("keydown", function (e) {{
-      if (e.key === "Enter" || e.key === " ") {{
-        e.preventDefault();
-        switchTab(tab.dataset.country);
-      }}
-    }});
-  }});
-
-  // Initial tab
+  // Initial selection
   switchTab(initialCountry);
 
-  // Expose for onclick attributes
+  // Expose for onchange attribute
   window.switchTab = switchTab;
 }})();
 </script>
