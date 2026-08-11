@@ -195,15 +195,17 @@ async def send_newsletter(state: NewsletterState) -> dict:
         active_countries = unified_issue.get("countries", list(newsletters.keys()))
 
         # Step 1: 모든 고유 수신인 수집 + 주담당 국가 결정
-        # 우선순위: 국가별 리스트에 등장하는 첫 번째 국가 (active_countries 순서)
-        # ALL에만 있는 경우: KR fallback
+        # 전략: "last wins" — active_countries 순서로 순회하며 덮어씀
+        # 효과: 복수 국가 겸직자는 순서상 나중 국가(더 세분화된 국가)로 배정
+        # 예) KR+RU 겸직 → RU배정 / KR 전담 → KR 유지
+        # ALL에만 있는 경우: KR(또는 첫 번째 활성 국가) fallback
         email_primary_country: dict[str, str] = {}
 
-        # 국가별 명시 수신인 먼저 처리 (active_countries 순서대로 — 앞 국가가 우선)
+        # 국가별 명시 수신인 처리 (active_countries 순서대로, 뒤 국가가 앞 국가를 덮어씀)
         for cc in active_countries:
             for email in country_to.get(cc, []):
-                if email and email not in email_primary_country:
-                    email_primary_country[email] = cc
+                if email:
+                    email_primary_country[email] = cc  # 덮어쓰기: last wins
 
         # ALL 수신인: 아직 배정 안 된 경우만 KR fallback
         for email in global_to:
