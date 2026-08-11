@@ -438,11 +438,12 @@ def _render_country_section_email(cs: CountrySection) -> str:
     emoji = COUNTRY_EMOJIS.get(country, "🌐")
     kpi = cs.get("kpi_data")
     insights = cs.get("insights") or _fallback_insights(articles)
-    recs = cs.get("recommendations") or _FALLBACK_RECS
+    # DISABLED ── 마케팅 전략 제언 (revert: uncomment the two lines below)
+    # recs = cs.get("recommendations") or _FALLBACK_RECS
+    # recs_html = _recommendations_html(recs)
 
     kpi_html = _kpi_dashboard(kpi)
     insights_html = _insights_html(insights)
-    recs_html = _recommendations_html(recs)
 
     if not articles:
         empty_msg = f'<tr><td style="padding:20px 0;font-family:{FONT};font-size:14px;color:#999;">이번 호에는 {name} 관련 소식이 없습니다.</td></tr>'
@@ -477,17 +478,18 @@ def _render_country_section_email(cs: CountrySection) -> str:
 {insights_html}
           </table>
 {sector_html}
-          <!-- 마케팅 전략 제언 -->
+          <!-- DISABLED: 마케팅 전략 제언 — revert by uncommenting recs/recs_html above and restoring this block:
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top:22px;">
             <tr>
               <td style="border-bottom:2px solid #C8121A;padding-bottom:6px;">
-                <span style="font-family:{FONT};font-size:16px;font-weight:bold;color:#1A1A1A;">🎯 마케팅 전략 제언</span>
+                <span style="font-family:FONT;font-size:16px;font-weight:bold;color:#1A1A1A;">🎯 마케팅 전략 제언</span>
               </td>
             </tr>
           </table>
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top:16px;">
-{recs_html}
+            recs_html here
           </table>
+          END DISABLED -->
         </td>
       </tr>"""
 
