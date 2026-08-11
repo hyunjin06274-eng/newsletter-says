@@ -1,12 +1,15 @@
 {
   "version": "2.0",
-  "lastUpdated": "2026-04-14T08:04:45.664Z",
+  "lastUpdated": "2026-08-11T08:33:30.157Z",
   "activeFeatures": [
     "core",
     "api",
     "nodes",
     "frontend",
-    "settings"
+    "settings",
+    "agent",
+    "[id]",
+    "scripts"
   ],
   "primaryFeature": "core",
   "features": {
@@ -32,9 +35,9 @@
       "documents": {},
       "timestamps": {
         "started": "2026-04-13T10:38:53.392Z",
-        "lastUpdated": "2026-04-13T10:38:54.105Z"
+        "lastUpdated": "2026-08-11T08:29:44.774Z"
       },
-      "lastFile": "/Users/summer/Desktop/always/SK 프로젝트/newsletter-saas/backend/api/schemas.py"
+      "lastFile": "/Users/summer/Desktop/SK-Enmove-Projects/SK 프로젝트/newsletter-saas/backend/api/routes.py"
     },
     "nodes": {
       "phase": "do",
@@ -45,9 +48,9 @@
       "documents": {},
       "timestamps": {
         "started": "2026-04-13T10:39:05.316Z",
-        "lastUpdated": "2026-04-14T08:04:45.664Z"
+        "lastUpdated": "2026-08-11T08:28:50.105Z"
       },
-      "lastFile": "/Users/summer/Desktop/always/SK 프로젝트/newsletter-saas/backend/agent/nodes/enricher.py"
+      "lastFile": "/Users/summer/Desktop/SK-Enmove-Projects/SK 프로젝트/newsletter-saas/backend/agent/nodes/sender.py"
     },
     "frontend": {
       "phase": "do",
@@ -74,6 +77,45 @@
         "lastUpdated": "2026-04-13T10:40:05.233Z"
       },
       "lastFile": "/Users/summer/Desktop/always/SK 프로젝트/newsletter-saas/frontend/app/settings/page.tsx"
+    },
+    "agent": {
+      "phase": "do",
+      "phaseNumber": 3,
+      "matchRate": null,
+      "iterationCount": 0,
+      "requirements": [],
+      "documents": {},
+      "timestamps": {
+        "started": "2026-08-11T08:21:45.320Z",
+        "lastUpdated": "2026-08-11T08:21:45.320Z"
+      },
+      "lastFile": "/Users/summer/Desktop/SK-Enmove-Projects/SK 프로젝트/newsletter-saas/backend/agent/state.py"
+    },
+    "[id]": {
+      "phase": "do",
+      "phaseNumber": 3,
+      "matchRate": null,
+      "iterationCount": 0,
+      "requirements": [],
+      "documents": {},
+      "timestamps": {
+        "started": "2026-08-11T08:32:46.352Z",
+        "lastUpdated": "2026-08-11T08:32:46.352Z"
+      },
+      "lastFile": "/Users/summer/Desktop/SK-Enmove-Projects/SK 프로젝트/newsletter-saas/frontend/app/newsletters/[id]/page.tsx"
+    },
+    "scripts": {
+      "phase": "do",
+      "phaseNumber": 3,
+      "matchRate": null,
+      "iterationCount": 0,
+      "requirements": [],
+      "documents": {},
+      "timestamps": {
+        "started": "2026-08-11T08:33:30.157Z",
+        "lastUpdated": "2026-08-11T08:33:30.157Z"
+      },
+      "lastFile": "/Users/summer/Desktop/SK-Enmove-Projects/SK 프로젝트/newsletter-saas/scripts/preview_issue.py"
     }
   },
   "pipeline": {
@@ -84,7 +126,7 @@
   "session": {
     "startedAt": "2026-04-07T11:18:38.035Z",
     "onboardingCompleted": false,
-    "lastActivity": "2026-04-14T08:04:45.664Z"
+    "lastActivity": "2026-08-11T08:33:30.157Z"
   },
   "history": [
     {
@@ -282,6 +324,54 @@
     {
       "timestamp": "2026-04-14T08:04:45.664Z",
       "feature": "nodes",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-11T08:21:45.320Z",
+      "feature": "agent",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-11T08:27:10.184Z",
+      "feature": "nodes",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-11T08:28:18.170Z",
+      "feature": "nodes",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-11T08:28:29.816Z",
+      "feature": "nodes",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-11T08:28:50.105Z",
+      "feature": "nodes",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-11T08:29:44.774Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-11T08:32:46.352Z",
+      "feature": "[id]",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-11T08:33:30.157Z",
+      "feature": "scripts",
       "phase": "do",
       "action": "updated"
     }
