@@ -24,6 +24,10 @@ on:
         description: "Run ID from backend (links GitHub Actions to DB row)"
         required: false
         default: ""
+      test_recipient:
+        description: "Test mode: send only to this email (skips settings recipients)"
+        required: false
+        default: ""
 
 env:
   ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -170,6 +174,12 @@ jobs:
           run_id = os.environ.get('RUN_ID', '')
           supabase_url = os.environ.get('SUPABASE_URL', '')
           supabase_key = os.environ.get('SUPABASE_KEY', '')
+          test_recipient = os.environ.get('TEST_RECIPIENT', '').strip()
+          if test_recipient:
+              print(f'=== TEST MODE: 발송 대상 {test_recipient} (설정 수신인 무시) ===', flush=True)
+              os.environ['DEFAULT_RECIPIENTS'] = test_recipient
+              # Supabase country_recipients를 무시하려면 SUPABASE_URL 제거
+              os.environ.pop('SUPABASE_URL', None)
           print(f'=== Starting pipeline for {countries} ===', flush=True)
 
           async def main():
@@ -241,6 +251,7 @@ jobs:
           INPUT_COUNTRIES: ${{ env.ACTIVE_COUNTRIES }}
           INPUT_DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
           RUN_ID: ${{ env.RUN_ID }}
+          TEST_RECIPIENT: ${{ github.event.inputs.test_recipient || '' }}
 
       - name: Update Supabase run to "completed"
         if: success()

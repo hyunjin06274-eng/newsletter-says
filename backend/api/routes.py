@@ -367,14 +367,13 @@ async def get_run_logs(run_id: str):
 
 @router.post("/test-send")
 async def test_send(body: dict):
-    """Send a test email using the latest unified_issue from Supabase.
+    """Trigger a test email send via GitHub Actions.
 
     Body: { "recipient": "email@example.com", "country": "RU", "run_id": "<optional>" }
-    The email is rendered for `country` and sent only to `recipient`.
+    Dispatches the schedule.yml workflow with test_recipient set, so Gmail
+    credentials stay in GitHub Actions and never need to be on Render.
     """
     import os
-    from backend.agent.nodes.renderer import render_email_html
-    from backend.agent.nodes.sender import create_email, get_gmail_service
 
     recipient = body.get("recipient", "").strip()
     country = body.get("country", "KR").strip().upper()
@@ -383,60 +382,42 @@ async def test_send(body: dict):
     if not recipient or "@" not in recipient:
         raise HTTPException(400, "recipient 이메일 주소가 필요합니다")
 
-    db = get_supabase()
+    github_token = os.environ.get("GH_DISPATCH_TOKEN", "")
+    if not github_token:
+        raise HTTPException(500, "GH_DISPATCH_TOKEN이 설정되지 않았습니다")
 
-    # Fetch run: from specific run_id or latest completed run
-    if run_id:
-        rows = db.select("runs", {"id": f"eq.{run_id}", "select": "id,unified_issue,newsletter_html,date_str"})
-    else:
-        rows = db.select("runs", {
-            "select": "id,unified_issue,newsletter_html,date_str",
-            "status": "eq.completed",
-            "order": "created_at.desc",
-            "limit": "1",
-        })
-
-    if not rows:
-        raise HTTPException(404, "완료된 run이 없습니다. 먼저 파이프라인을 실행하세요.")
-
-    row = rows[0]
-    date_str = row.get("date_str", datetime.now().strftime("%Y%m%d"))
-    unified_issue = row.get("unified_issue")
-
-    if unified_issue:
-        # Unified mode: render per-country email from unified_issue
-        html = render_email_html(
-            issue=unified_issue,
-            recipient_country=country,
-            run_id=unified_issue.get("run_id", "test"),
-            days=30,
-            raw_count=0,
-            source_count=0,
-        )
-    else:
-        # Legacy fallback: use saved newsletter_html[country]
-        newsletters = row.get("newsletter_html") or {}
-        html = newsletters.get(country, "")
-        if not html:
-            raise HTTPException(404, f"newsletter_html[{country}]이 없습니다. 해당 국가로 파이프라인을 실행하세요.")
-
-    sender_addr = os.environ.get("GMAIL_SENDER", "skenbizst@gmail.com")
-    subject = f"[테스트] SK엔무브 윤활유 시장 뉴스레터 ({date_str[:4]}.{date_str[4:6]}.{date_str[6:]})"
-
+    repo = "hyunjin06274-eng/newsletter-says"
     try:
-        service = await asyncio.to_thread(get_gmail_service)
-        message = create_email(sender_addr, [recipient], subject, html)
-        await asyncio.to_thread(
-            service.users().messages().send(userId="me", body=message).execute
+        resp = requests.post(
+            f"https://api.github.com/repos/{repo}/actions/workflows/schedule.yml/dispatches",
+            headers={
+                "Authorization": f"Bearer {github_token}",
+                "Accept": "application/vnd.github.v3+json",
+            },
+            json={
+                "ref": "main",
+                "inputs": {
+                    "countries": country,
+                    "dry_run": "false",
+                    "force_run": "true",
+                    "run_id": run_id,
+                    "test_recipient": recipient,
+                },
+            },
+            timeout=10,
         )
+        if resp.status_code not in (200, 204):
+            raise HTTPException(500, f"GitHub Actions 디스패치 실패: {resp.status_code}")
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(500, f"발송 실패: {e}")
+        raise HTTPException(500, f"GitHub Actions 디스패치 오류: {e}")
 
     return {
-        "status": "sent",
+        "status": "dispatched",
         "recipient": recipient,
         "country": country,
-        "subject": subject,
+        "message": f"GitHub Actions 파이프라인이 {country} 뉴스레터를 {recipient}로 발송합니다. 완료까지 약 2~5분 소요.",
     }
 
 
