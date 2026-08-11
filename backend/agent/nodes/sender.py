@@ -104,11 +104,27 @@ def create_email(sender: str, to: list[str], subject: str, html_body: str, cc: l
 
 
 async def send_newsletter(state: NewsletterState) -> dict:
-    """Send newsletters via Gmail API."""
+    """Send newsletters via Gmail API.
+
+    When USE_UNIFIED_NEWSLETTER=true:
+      - Uses state.unified_issue + renderer.render_email_html() per country
+      - Email contains Global section + recipient country section (A안)
+      - Subject unchanged: per-country subject line
+      - Web archive link included in footer (?country=XX)
+
+    When USE_UNIFIED_NEWSLETTER=false (default / legacy):
+      - Uses state.newsletters[country] HTML directly (unchanged behaviour)
+    """
     import asyncio
 
+    use_unified = os.environ.get("USE_UNIFIED_NEWSLETTER", "false").lower() == "true"
+
     newsletters = state.get("newsletters", {})
+    unified_issue = state.get("unified_issue", {})
     date_str = state.get("date_str", datetime.now().strftime("%Y%m%d"))
+    days = state.get("days", 30)
+    raw_articles = state.get("raw_articles", {})
+    merged_articles = state.get("merged_articles", {})
     sender = os.environ.get("GMAIL_SENDER", "skenbizst@gmail.com")
     send_results: dict[str, bool] = {}
 
@@ -169,7 +185,15 @@ async def send_newsletter(state: NewsletterState) -> dict:
             "phase_status": {**state.get("phase_status", {}), "sending": "failed"},
         }
 
-    for country, html in newsletters.items():
+    # Determine which countries have newsletters/recipients to send
+    send_countries = list(newsletters.keys()) if newsletters else []
+
+    # In unified mode, iterate over the issue's country list so zero-article
+    # countries (which have no legacy HTML) still attempt delivery
+    if use_unified and unified_issue:
+        send_countries = unified_issue.get("countries", send_countries)
+
+    for country in send_countries:
         country_name = COUNTRY_NAMES.get(country, country)
         subject = f"{country_name} 윤활유 시장 뉴스레터 ({date_str[:4]}.{date_str[4:6]}.{date_str[6:]})"
 
@@ -184,6 +208,36 @@ async def send_newsletter(state: NewsletterState) -> dict:
             logger.warning(f"[{country}] No TO recipients configured, skipping")
             send_results[country] = False
             continue
+
+        # ── Choose HTML source ────────────────────────────────────────────────
+        if use_unified and unified_issue:
+            from backend.agent.nodes.issue_builder import get_recipient_default_country
+            from backend.agent.nodes.renderer import render_email_html
+
+            # Recipient country = the country whose section they receive as default
+            recipient_country = get_recipient_default_country(
+                country, unified_issue.get("countries", [])
+            )
+            raw_count = len(raw_articles.get(country, []))
+            merged = merged_articles.get(country, [])
+            source_count = len(set(a.get("source", "") for a in merged if a.get("source")))
+
+            html = render_email_html(
+                issue=unified_issue,
+                recipient_country=recipient_country,
+                run_id=unified_issue.get("run_id", ""),
+                days=days,
+                raw_count=raw_count,
+                source_count=source_count,
+            )
+            logger.info(f"[{country}] Unified email rendered ({len(html)} chars)")
+        else:
+            # Legacy path: use pre-built per-country HTML
+            html = newsletters.get(country, "")
+            if not html:
+                logger.warning(f"[{country}] No newsletter HTML found, skipping")
+                send_results[country] = False
+                continue
 
         try:
             message = create_email(sender, to_list, subject, html, cc=cc_list or None)

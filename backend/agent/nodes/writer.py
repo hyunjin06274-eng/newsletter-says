@@ -511,20 +511,39 @@ def build_newsletter_html(
 
 
 async def write_newsletter(state: NewsletterState) -> dict:
-    """Generate HTML newsletters for all countries."""
+    """Generate HTML newsletters for all countries.
+
+    When USE_UNIFIED_NEWSLETTER=true (feature flag):
+      - Runs LLM per country (same as before — N countries, not N recipients)
+      - Builds a UnifiedIssue with global + per-country sections
+      - Stores in state.unified_issue
+      - Also writes state.newsletters (per-country HTML) for auditing + rollback
+
+    When USE_UNIFIED_NEWSLETTER=false (default / legacy):
+      - Behaviour unchanged: builds per-country HTML and stores in state.newsletters
+    """
     import anthropic
     import asyncio
+
+    use_unified = os.environ.get("USE_UNIFIED_NEWSLETTER", "false").lower() == "true"
 
     grouped = state.get("grouped_articles", {})
     raw_articles = state.get("raw_articles", {})
     merged_articles = state.get("merged_articles", {})
     kpi_data = state.get("kpi_data", {})
     days = state.get("days", 30)
+    countries = state.get("countries", list(grouped.keys()))
+    run_id = state.get("run_id", "")
+    date_str = state.get("date_str", datetime.now().strftime("%Y%m%d"))
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     newsletters: dict[str, str] = {}
     audit_feedback = state.get("audit_feedback", {})
     iteration = state.get("audit_iteration", 0)
     client = anthropic.Anthropic(api_key=api_key) if api_key else None
+
+    # Collected per-country for unified issue builder
+    insights_by_country: dict[str, list[str]] = {}
+    recommendations_by_country: dict[str, list[str]] = {}
 
     for country, articles in grouped.items():
         # Raw collected count (before filtering)
@@ -583,6 +602,11 @@ JSON만 출력: {{"insights": ["...", "...", "...", "...", "..."], "recommendati
             except Exception as e:
                 logger.warning(f"[{country}] LLM generation failed: {e}")
 
+        # Store for unified issue builder regardless of flag
+        insights_by_country[country] = insights
+        recommendations_by_country[country] = recommendations
+
+        # Always build per-country HTML (used by auditor + legacy sender + rollback)
         newsletters[country] = build_newsletter_html(
             country=country,
             articles=articles,
@@ -596,7 +620,26 @@ JSON만 출력: {{"insights": ["...", "...", "...", "...", "..."], "recommendati
         logger.info(f"[{country}] Newsletter generated ({len(newsletters[country])} chars)")
         print(f"[{country}] Newsletter generated ({len(newsletters[country])} chars)", flush=True)
 
-    return {
+    # ── Build UnifiedIssue when flag is on ───────────────────────────────────
+    unified_issue = {}
+    if use_unified:
+        from backend.agent.nodes.issue_builder import build_unified_issue
+        unified_issue = build_unified_issue(
+            run_id=run_id,
+            date_str=date_str,
+            countries=countries,
+            grouped_articles=grouped,
+            insights_by_country=insights_by_country,
+            recommendations_by_country=recommendations_by_country,
+            kpi_data=kpi_data,
+        )
+        logger.info(
+            f"[unified] Issue built — global={len(unified_issue['global_section']['articles'])} articles, "
+            f"countries={list(unified_issue['country_sections'].keys())}"
+        )
+        print(f"[unified] Issue built with {len(countries)} country sections", flush=True)
+
+    result: dict = {
         "newsletters": newsletters,
         "current_phase": "auditing",
         "phase_status": {**state.get("phase_status", {}), "writing": "done"},
@@ -605,3 +648,6 @@ JSON만 출력: {{"insights": ["...", "...", "...", "...", "..."], "recommendati
              "iteration": iteration}
         ],
     }
+    if unified_issue:
+        result["unified_issue"] = unified_issue
+    return result
