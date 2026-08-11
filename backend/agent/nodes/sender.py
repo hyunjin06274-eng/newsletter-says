@@ -185,13 +185,91 @@ async def send_newsletter(state: NewsletterState) -> dict:
             "phase_status": {**state.get("phase_status", {}), "sending": "failed"},
         }
 
-    # Determine which countries have newsletters/recipients to send
-    send_countries = list(newsletters.keys()) if newsletters else []
-
-    # In unified mode, iterate over the issue's country list so zero-article
-    # countries (which have no legacy HTML) still attempt delivery
+    # ── UNIFIED MODE: 1인 1통 발송 ───────────────────────────────────────────
+    # 기존 구조: 국가별 TO 리스트에 반복 → 같은 사람이 최대 N통 수신
+    # 개선 구조: 수신인별 주담당 국가 1개 결정 → 주담당 국가별로 묶어 1통씩 발송
     if use_unified and unified_issue:
-        send_countries = unified_issue.get("countries", send_countries)
+        from backend.agent.nodes.issue_builder import get_recipient_default_country
+        from backend.agent.nodes.renderer import render_email_html
+
+        active_countries = unified_issue.get("countries", list(newsletters.keys()))
+
+        # Step 1: 모든 고유 수신인 수집 + 주담당 국가 결정
+        # 우선순위: 국가별 리스트에 등장하는 첫 번째 국가 (active_countries 순서)
+        # ALL에만 있는 경우: KR fallback
+        email_primary_country: dict[str, str] = {}
+
+        # 국가별 명시 수신인 먼저 처리 (active_countries 순서대로 — 앞 국가가 우선)
+        for cc in active_countries:
+            for email in country_to.get(cc, []):
+                if email and email not in email_primary_country:
+                    email_primary_country[email] = cc
+
+        # ALL 수신인: 아직 배정 안 된 경우만 KR fallback
+        for email in global_to:
+            if email and email not in email_primary_country:
+                email_primary_country[email] = get_recipient_default_country(
+                    None, active_countries
+                )
+
+        # Step 2: 주담당 국가별로 수신인 묶기
+        groups: dict[str, list[str]] = {}
+        for email, cc in email_primary_country.items():
+            groups.setdefault(cc, []).append(email)
+
+        total_recipients = len(email_primary_country)
+        logger.info(
+            f"[unified sender] {total_recipients}명 → {len(groups)}개 그룹 "
+            f"(중복 수신 제거: 1인 1통)"
+        )
+        print(
+            f"[unified sender] {total_recipients}명 → {len(groups)}개 그룹으로 발송 "
+            f"(기존 중복 발송 제거)",
+            flush=True,
+        )
+
+        # Step 3: 그룹별 1통 발송
+        for cc, recipients in groups.items():
+            raw_count = len(raw_articles.get(cc, []))
+            merged = merged_articles.get(cc, [])
+            source_count = len({a.get("source", "") for a in merged if a.get("source")})
+
+            html = render_email_html(
+                issue=unified_issue,
+                recipient_country=cc,
+                run_id=unified_issue.get("run_id", ""),
+                days=days,
+                raw_count=raw_count,
+                source_count=source_count,
+            )
+
+            country_name = COUNTRY_NAMES.get(cc, cc)
+            subject = f"SK엔무브 윤활유 시장 뉴스레터 ({date_str[:4]}.{date_str[4:6]}.{date_str[6:]})"
+
+            try:
+                message = create_email(sender, recipients, subject, html)
+                await asyncio.to_thread(
+                    service.users().messages().send(userId="me", body=message).execute
+                )
+                send_results[cc] = True
+                logger.info(f"[{cc}] 통합 이메일 발송 → {len(recipients)}명: {recipients}")
+                print(f"[{cc}] 통합 이메일 발송 → {len(recipients)}명", flush=True)
+            except Exception as e:
+                logger.error(f"[{cc}] Send failed: {e}")
+                send_results[cc] = False
+
+        return {
+            "send_results": send_results,
+            "current_phase": "complete",
+            "phase_status": {**state.get("phase_status", {}), "sending": "done"},
+            "events": state.get("events", []) + [
+                {"type": "phase_complete", "phase": "sending", "ts": datetime.now().isoformat(),
+                 "results": send_results}
+            ],
+        }
+
+    # ── LEGACY MODE: 기존 국가별 발송 (변경 없음) ────────────────────────────
+    send_countries = list(newsletters.keys()) if newsletters else []
 
     for country in send_countries:
         country_name = COUNTRY_NAMES.get(country, country)
@@ -209,35 +287,11 @@ async def send_newsletter(state: NewsletterState) -> dict:
             send_results[country] = False
             continue
 
-        # ── Choose HTML source ────────────────────────────────────────────────
-        if use_unified and unified_issue:
-            from backend.agent.nodes.issue_builder import get_recipient_default_country
-            from backend.agent.nodes.renderer import render_email_html
-
-            # Recipient country = the country whose section they receive as default
-            recipient_country = get_recipient_default_country(
-                country, unified_issue.get("countries", [])
-            )
-            raw_count = len(raw_articles.get(country, []))
-            merged = merged_articles.get(country, [])
-            source_count = len(set(a.get("source", "") for a in merged if a.get("source")))
-
-            html = render_email_html(
-                issue=unified_issue,
-                recipient_country=recipient_country,
-                run_id=unified_issue.get("run_id", ""),
-                days=days,
-                raw_count=raw_count,
-                source_count=source_count,
-            )
-            logger.info(f"[{country}] Unified email rendered ({len(html)} chars)")
-        else:
-            # Legacy path: use pre-built per-country HTML
-            html = newsletters.get(country, "")
-            if not html:
-                logger.warning(f"[{country}] No newsletter HTML found, skipping")
-                send_results[country] = False
-                continue
+        html = newsletters.get(country, "")
+        if not html:
+            logger.warning(f"[{country}] No newsletter HTML found, skipping")
+            send_results[country] = False
+            continue
 
         try:
             message = create_email(sender, to_list, subject, html, cc=cc_list or None)
