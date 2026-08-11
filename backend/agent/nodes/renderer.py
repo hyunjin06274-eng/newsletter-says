@@ -322,19 +322,19 @@ _FALLBACK_RECS = [
 
 
 def _email_header(recipient_country: str, date_str: str, days: int,
-                  raw_count: int, source_count: int) -> str:
+                  raw_count: int, source_count: int, total_countries: int = 1) -> str:
     name = COUNTRY_NAMES.get(recipient_country, recipient_country)
     emoji = COUNTRY_EMOJIS.get(recipient_country, "🌐")
-    market_label = MARKET_LABELS.get(recipient_country, f"{recipient_country} MARKET")
     now = datetime.now()
     today = now.strftime("%Y.%m.%d")
     weekday = WEEKDAYS_KR[now.weekday()]
+    countries_note = f" &nbsp;·&nbsp; 전체 {total_countries}개국 수록" if total_countries > 1 else ""
     return f"""  <!-- ═══ HEADER ═══ -->
       <tr>
         <td bgcolor="#f04c23" style="background-color:#f04c23;border-radius:8px 8px 0 0;padding:9px 28px;">
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
             <tr>
-              <td style="font-family:{FONT};font-size:10px;color:#FFFFFF;letter-spacing:2px;">SK ENMOVE &nbsp;&nbsp;·&nbsp;&nbsp; LUBRICANT MARKET INTELLIGENCE</td>
+              <td style="font-family:{FONT};font-size:10px;color:#FFFFFF;letter-spacing:2px;">SK ENMOVE &nbsp;&nbsp;·&nbsp;&nbsp; LUBRICANT MARKET INTELLIGENCE{countries_note}</td>
               <td align="right" style="font-family:{FONT};font-size:10px;color:#FFFFFF;">{today} {weekday}</td>
             </tr>
           </table>
@@ -342,12 +342,13 @@ def _email_header(recipient_country: str, date_str: str, days: int,
       </tr>
       <tr>
         <td bgcolor="#e3000f" style="background-color:#e3000f;padding:20px 28px 0 28px;">
-          <div style="font-family:{FONT};font-size:12px;color:#FFFFFF;letter-spacing:1px;margin-bottom:1px;">{emoji} &nbsp;{market_label}</div>
-          <div style="font-family:{FONT};font-size:26px;font-weight:bold;color:#FFFFFF;line-height:1.2;letter-spacing:-0.5px;">{name} 윤활유 시장 Weekly Brief</div>
+          <div style="font-family:{FONT};font-size:12px;color:#FFFFFF;letter-spacing:1px;margin-bottom:1px;">🌐 &nbsp;GLOBAL MARKET</div>
+          <div style="font-family:{FONT};font-size:26px;font-weight:bold;color:#FFFFFF;line-height:1.2;letter-spacing:-0.5px;">글로벌 윤활유 시장 Weekly Brief</div>
+          <div style="font-family:{FONT};font-size:13px;color:rgba(255,255,255,0.85);margin-top:6px;">👤 &nbsp;담당 국가: {emoji} {name}</div>
         </td>
       </tr>
       <tr>
-        <td bgcolor="#e3000f" style="background-color:#e3000f;height:24px;font-size:1px;line-height:1px;">&nbsp;</td>
+        <td bgcolor="#e3000f" style="background-color:#e3000f;height:16px;font-size:1px;line-height:1px;">&nbsp;</td>
       </tr>
       <tr>
         <td bgcolor="#e3000f" style="background-color:#e3000f;padding:0 28px 11px 28px;">
@@ -364,26 +365,11 @@ def _email_header(recipient_country: str, date_str: str, days: int,
       </tr>"""
 
 
-def _email_footer(run_id: str, recipient_country: str, web_base_url: str) -> str:
+def _email_footer() -> str:
     sender_email = os.environ.get("GMAIL_SENDER", "skenbizst@gmail.com")
     now = datetime.now()
     today = now.strftime("%Y.%m.%d")
-    web_url = f"{web_base_url}/newsletters/{run_id}?country={recipient_country}"
-    return f"""      <!-- ═══ WEB LINK ═══ -->
-      <tr>
-        <td style="background-color:#FFFFFF;padding:24px 28px 0 28px;">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border:1px solid #E0E0E0;border-radius:6px;background-color:#F8F8F8;">
-            <tr>
-              <td style="padding:16px 20px;">
-                <span style="font-family:{FONT};font-size:14px;font-weight:bold;color:#1A1A1A;">🌐 다른 국가 뉴스 보기</span><br>
-                <span style="font-family:{FONT};font-size:13px;color:#666;line-height:1.7;">이 뉴스레터에는 전체 국가 소식이 수록되어 있습니다.<br>웹 버전에서 국가 탭을 선택해 다른 시장 동향을 확인하세요.</span><br>
-                <a href="{web_url}" style="font-family:{FONT};font-size:13px;color:#e3000f;font-weight:bold;">→ 웹에서 전체 국가 뉴스 보기</a>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-      <!-- ═══ FOOTER ═══ -->
+    return f"""      <!-- ═══ FOOTER ═══ -->
       <tr>
         <td style="background-color:#FFFFFF;padding:28px 28px 0 28px;">
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
@@ -509,6 +495,17 @@ def _render_country_section_email(cs: CountrySection) -> str:
 # ── Public API ────────────────────────────────────────────────────────────────
 
 
+def _country_divider() -> str:
+    """Horizontal divider between country sections."""
+    return f"""      <tr>
+        <td style="background-color:#FFFFFF;padding:28px 28px 0 28px;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+            <tr><td style="border-top:2px dashed #DDDDDD;"></td></tr>
+          </table>
+        </td>
+      </tr>"""
+
+
 def render_email_html(
     issue: UnifiedIssue,
     recipient_country: str,
@@ -518,28 +515,37 @@ def render_email_html(
     source_count: int = 0,
     web_base_url: str = "",
 ) -> str:
-    """Render A안 email HTML: Global section + recipient country section.
+    """Render email HTML: Global section + all country sections (recipient first).
 
     Compatible with Gmail and Outlook (table-based layout, no JS).
-    Footer includes a link to the web version with ?country=<recipient_country>.
+    All countries are included inline so recipients can scroll to see other markets.
     """
-    if not web_base_url:
-        web_base_url = (
-            os.environ.get("WEB_BASE_URL")
-            or os.environ.get("FRONTEND_URL")
-            or "https://frontend-gamma-eight-32.vercel.app"
-        )
-
     global_section = issue.get("global_section", GlobalSection(articles=[]))
     country_sections = issue.get("country_sections", {})
-    cs = country_sections.get(recipient_country, CountrySection(
-        country=recipient_country, articles=[], insights=[], recommendations=[], kpi_data={},
-    ))
+    countries = issue.get("countries", [])
 
-    header = _email_header(recipient_country, issue.get("date_str", ""), days, raw_count, source_count)
+    # Ensure recipient country is first; append remaining in pipeline order
+    ordered = [recipient_country] + [c for c in countries if c != recipient_country]
+    # Only include countries that have a section in the issue
+    ordered = [c for c in ordered if c in country_sections or c == recipient_country]
+
+    header = _email_header(
+        recipient_country, issue.get("date_str", ""), days,
+        raw_count, source_count, total_countries=len(ordered),
+    )
     global_html = _render_global_section_email(global_section, days)
-    country_html = _render_country_section_email(cs)
-    footer = _email_footer(run_id, recipient_country, web_base_url)
+
+    # Render all country sections with dividers between them
+    all_countries_html = ""
+    for i, cc in enumerate(ordered):
+        cs = country_sections.get(cc, CountrySection(
+            country=cc, articles=[], insights=[], recommendations=[], kpi_data={},
+        ))
+        if i > 0:
+            all_countries_html += _country_divider()
+        all_countries_html += _render_country_section_email(cs)
+
+    footer = _email_footer()
 
     return f"""<!DOCTYPE html>
 <html lang="ko" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
@@ -566,7 +572,7 @@ def render_email_html(
     <table role="presentation" width="620" cellspacing="0" cellpadding="0" border="0" style="width:620px;max-width:620px;">
 {header}
 {global_html}
-{country_html}
+{all_countries_html}
 {footer}
     </table>
     </td>
