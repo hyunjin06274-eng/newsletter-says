@@ -139,24 +139,20 @@ jobs:
           COUNTRIES=$(python3 -c "import json,os; print(json.dumps(os.environ['ACTIVE_COUNTRIES'].split(',')))")
           echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
           echo "DATE_STR=$DATE_STR" >> $GITHUB_ENV
-          # PATCH if run already exists (from backend), INSERT if new (from schedule)
-          PATCH_RESP=$(curl -s -o /dev/null -w "%{http_code}" -X PATCH \
-            "${{ secrets.SUPABASE_URL }}/rest/v1/runs?id=eq.$RUN_ID" \
+          # UPSERT: POST with resolution=merge-duplicates → INSERT if new, UPDATE if exists
+          # Fixes bug: PATCH returns 204 even when no row exists (Supabase no-op), causing
+          # skipped INSERT and missing run records for scheduled/direct-dispatch runs.
+          UPSERT_RESP=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/runs" \
             -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}" \
             -H "Content-Type: application/json" \
-            -H "Prefer: return=minimal" \
-            -d "{\"status\":\"running\",\"current_phase\":\"collection\",\"countries\":$COUNTRIES,\"date_str\":\"$DATE_STR\"}")
-          if [ "$PATCH_RESP" = "204" ]; then
-            echo "Supabase run $RUN_ID updated (existing row)"
+            -H "Prefer: resolution=merge-duplicates,return=minimal" \
+            -d "{\"id\":\"$RUN_ID\",\"date_str\":\"$DATE_STR\",\"countries\":$COUNTRIES,\"status\":\"running\",\"current_phase\":\"collection\"}")
+          if [ "$UPSERT_RESP" = "204" ] || [ "$UPSERT_RESP" = "201" ]; then
+            echo "Supabase run $RUN_ID upserted (HTTP $UPSERT_RESP)"
           else
-            curl -s -X POST "${{ secrets.SUPABASE_URL }}/rest/v1/runs" \
-              -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
-              -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}" \
-              -H "Content-Type: application/json" \
-              -H "Prefer: return=minimal" \
-              -d "{\"id\":\"$RUN_ID\",\"date_str\":\"$DATE_STR\",\"countries\":$COUNTRIES,\"status\":\"running\",\"current_phase\":\"collection\"}" || true
-            echo "Supabase run $RUN_ID inserted (new row)"
+            echo "⚠️ Supabase upsert returned HTTP $UPSERT_RESP (non-fatal)"
           fi
 
       - name: Run newsletter pipeline
