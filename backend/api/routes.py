@@ -385,33 +385,40 @@ async def test_send(body: dict):
 
     db = get_supabase()
 
-    # Fetch unified_issue: from specific run_id or latest completed run
+    # Fetch run: from specific run_id or latest completed run
     if run_id:
-        rows = db.select("runs", {"id": f"eq.{run_id}", "select": "unified_issue,date_str"})
+        rows = db.select("runs", {"id": f"eq.{run_id}", "select": "id,unified_issue,newsletter_html,date_str"})
     else:
         rows = db.select("runs", {
-            "select": "unified_issue,date_str",
+            "select": "id,unified_issue,newsletter_html,date_str",
             "status": "eq.completed",
             "order": "created_at.desc",
             "limit": "1",
         })
 
-    if not rows or not rows[0].get("unified_issue"):
-        raise HTTPException(404, "unified_issue를 찾을 수 없습니다. 먼저 파이프라인을 실행하세요.")
+    if not rows:
+        raise HTTPException(404, "완료된 run이 없습니다. 먼저 파이프라인을 실행하세요.")
 
     row = rows[0]
-    unified_issue = row["unified_issue"]
     date_str = row.get("date_str", datetime.now().strftime("%Y%m%d"))
+    unified_issue = row.get("unified_issue")
 
-    # Render email HTML for requested country
-    html = render_email_html(
-        issue=unified_issue,
-        recipient_country=country,
-        run_id=unified_issue.get("run_id", "test"),
-        days=30,
-        raw_count=0,
-        source_count=0,
-    )
+    if unified_issue:
+        # Unified mode: render per-country email from unified_issue
+        html = render_email_html(
+            issue=unified_issue,
+            recipient_country=country,
+            run_id=unified_issue.get("run_id", "test"),
+            days=30,
+            raw_count=0,
+            source_count=0,
+        )
+    else:
+        # Legacy fallback: use saved newsletter_html[country]
+        newsletters = row.get("newsletter_html") or {}
+        html = newsletters.get(country, "")
+        if not html:
+            raise HTTPException(404, f"newsletter_html[{country}]이 없습니다. 해당 국가로 파이프라인을 실행하세요.")
 
     sender_addr = os.environ.get("GMAIL_SENDER", "skenbizst@gmail.com")
     subject = f"[테스트] SK엔무브 윤활유 시장 뉴스레터 ({date_str[:4]}.{date_str[4:6]}.{date_str[6:]})"
