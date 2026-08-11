@@ -51,18 +51,23 @@ CRITICAL — COUNTRY vs GLOBAL classification:
 Target country: {country}
 Note: If target country is "GCC", treat ANY of these as "local": Saudi Arabia (SA), UAE (AE), Kuwait (KW), Qatar (QA), Bahrain (BH), Oman (OM), or GCC/Gulf States as a whole.
 
-Classify scope strictly:
+Classify scope:
 - "local" = article is specifically about {country} market, companies, events, or policy
-- "global" = ONLY use for: OPEC production decisions, API/ACEA/ILSAC spec changes,
-             Group II/III base oil price shifts, or supply disruptions affecting ALL markets equally.
-             Do NOT use "global" for articles about US, Europe, India, China, or any other single market.
-- "other_country" = article is about a DIFFERENT specific country or region, NOT {country}.
-             Use this even if the article mentions lubricants or vehicles — if the market focus
-             is another country (e.g., US motor oil shortage, India EV policy, Philippine car sales),
-             classify as "other_country" → total score MUST be 0.
+- "global" = Use for events that affect MULTIPLE markets simultaneously:
+             • OPEC production decisions, Brent/WTI crude price moves
+             • API/ACEA/ILSAC/JASO lubricant spec changes or announcements
+             • Group II/III base oil price shifts or supply disruptions affecting 3+ regions
+             • Cross-regional supply chain disruptions (Suez, Strait of Hormuz, sanctions)
+             • Major global lubricant brand strategy shifts announced across multiple markets
+             • EV/ICE transition trends driven by global OEMs (Toyota, Stellantis, VW) citing multi-market impact
+             Still NOT global: an article about a single country's market (US, EU, China, India alone)
+             unless it explicitly states multi-region or worldwide impact on lubricant supply/demand.
+- "other_country" = article is about a DIFFERENT specific country or region, NOT {country},
+             with no clear multi-market spillover.
+             Total score MUST be 0 — but still provide score_sales and score_action honestly.
 
 IMPORTANT: When in doubt between "global" and "other_country", choose "other_country".
-A US market article about motor oil shortage is NOT global — it is "other_country" for {country}.
+A US motor oil shortage article is NOT global unless it explicitly affects global base oil supply.
 
 Article:
 Title: {title}
@@ -304,6 +309,25 @@ GLOBAL_BYPASS_KEYWORDS = [
     "base oil group ii", "base oil group iii", "group ii base", "group iii base",
     "api specification", "acea specification", "ilsac specification",
     "jaso specification",
+    # 추가: 크로스마켓 공급망·규제
+    "suez canal", "strait of hormuz", "global supply chain",
+    "global lubricant", "lubricant demand global", "worldwide lubricant",
+    "global base oil", "base oil supply", "global oil demand",
+]
+
+# ── 레벨업 키워드: other_country 기사 중 글로벌 승격 후보 식별용
+# score_sales + score_action 기준도 함께 충족해야 승격
+GLOBAL_LEVELUP_KEYWORDS = [
+    "opec", "crude oil", "brent", "wti",
+    "base oil", "group ii", "group iii",
+    "api sp", "api ci", "api ck", "api fa",
+    "acea c", "ilsac gf", "jaso ma",
+    "global supply", "global demand", "supply chain disruption",
+    "worldwide", "global lubricant", "global oil",
+    "suez", "hormuz", "sanctions", "embargo",
+    "global automotive", "global fleet", "global ev transition",
+    "international regulation", "global regulation",
+    "multi-market", "cross-border", "cross-regional",
 ]
 
 
@@ -417,6 +441,10 @@ async def score_single_article(article: Article, client) -> Article:
             scope = data.get("scope", "local")
             if scope == "other_country":
                 article["score"] = 0
+                # Save component scores even for other_country — needed for level-up check
+                article["score_sales"] = min(data.get("score_sales", 0), 10)
+                article["score_action"] = min(data.get("score_action", 0), 10)
+                article["score_country"] = 0
                 article["score_reason"] = "Other country - rejected"
             else:
                 s1 = min(data.get("score_sales", 0), 10)
@@ -439,6 +467,20 @@ async def score_single_article(article: Article, client) -> Article:
         article["score"] = 0
 
     return article
+
+
+def _try_levelup_to_global(article: Article) -> bool:
+    """other_country 기사 중 글로벌 승격 기준 충족 여부 판단.
+
+    조건:
+    - 글로벌 신호 키워드 포함
+    - score_sales + score_action >= 12 (20점 만점의 60%)
+    """
+    text = f"{article.get('title', '')} {article.get('snippet', '')}".lower()
+    sales = article.get("score_sales", 0)
+    action = article.get("score_action", 0)
+    has_signal = any(kw in text for kw in GLOBAL_LEVELUP_KEYWORDS)
+    return has_signal and (sales + action) >= 12
 
 
 async def score_articles(state: NewsletterState) -> dict:
@@ -494,9 +536,23 @@ async def score_articles(state: NewsletterState) -> dict:
                 s = scored_article.get("score", 0)
                 sc = scored_article.get("score_country", 0)
                 scope = scored_article.get("scope", "local")
+
+                # ── 레벨업: other_country → global ───────────────────────────
+                if scope == "other_country" and _try_levelup_to_global(scored_article):
+                    s1 = scored_article.get("score_sales", 0)
+                    s3 = scored_article.get("score_action", 0)
+                    scored_article["scope"] = "global"
+                    scored_article["score_country"] = 1  # cross-market = 1점
+                    scored_article["score"] = s1 + 1 + s3
+                    scored_article["score_reason"] = f"[레벨업→글로벌] {scored_article.get('score_reason', '')}"
+                    scored_article["tags"] = list(set(scored_article.get("tags", []) + ["글로벌"]))
+                    scope = "global"
+                    s = scored_article["score"]
+                    sc = 1
+                    print(f"  🌐 [{country}] Level-up → global: {title_short}", flush=True)
+
                 if scope == "global":
-                    # Global articles are never country-specific by definition — judge them on
-                    # sales+action impact only (20-pt scale) instead of penalizing low score_country.
+                    # Global articles: judge on sales+action only (20-pt scale)
                     global_relevance = scored_article.get("score_sales", 0) + scored_article.get("score_action", 0)
                     global_bar = round(min_total_score * 2 / 3)
                     accept = global_relevance >= global_bar
@@ -507,9 +563,9 @@ async def score_articles(state: NewsletterState) -> dict:
 
                 if accept:
                     scored_articles.append(scored_article)
-                    print(f"  📊 [{country}] -> score={s} (country={sc}) ✓", flush=True)
+                    print(f"  📊 [{country}] -> score={s} (country={sc}) scope={scope} ✓", flush=True)
                 else:
-                    print(f"  📊 [{country}] -> score={s} (country={sc}) ✗ ({reason})", flush=True)
+                    print(f"  📊 [{country}] -> score={s} (country={sc}) scope={scope} ✗ ({reason})", flush=True)
         else:
             for a in to_score:
                 a["score"] = 3
