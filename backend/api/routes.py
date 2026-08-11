@@ -365,6 +365,74 @@ async def get_run_logs(run_id: str):
     return {"logs": rows}
 
 
+@router.post("/test-send")
+async def test_send(body: dict):
+    """Send a test email using the latest unified_issue from Supabase.
+
+    Body: { "recipient": "email@example.com", "country": "RU", "run_id": "<optional>" }
+    The email is rendered for `country` and sent only to `recipient`.
+    """
+    import os
+    from backend.agent.nodes.renderer import render_email_html
+    from backend.agent.nodes.sender import create_email, get_gmail_service
+
+    recipient = body.get("recipient", "").strip()
+    country = body.get("country", "KR").strip().upper()
+    run_id = body.get("run_id", "").strip()
+
+    if not recipient or "@" not in recipient:
+        raise HTTPException(400, "recipient 이메일 주소가 필요합니다")
+
+    db = get_supabase()
+
+    # Fetch unified_issue: from specific run_id or latest completed run
+    if run_id:
+        rows = db.select("runs", {"id": f"eq.{run_id}", "select": "unified_issue,date_str"})
+    else:
+        rows = db.select("runs", {
+            "select": "unified_issue,date_str",
+            "status": "eq.completed",
+            "order": "created_at.desc",
+            "limit": "1",
+        })
+
+    if not rows or not rows[0].get("unified_issue"):
+        raise HTTPException(404, "unified_issue를 찾을 수 없습니다. 먼저 파이프라인을 실행하세요.")
+
+    row = rows[0]
+    unified_issue = row["unified_issue"]
+    date_str = row.get("date_str", datetime.now().strftime("%Y%m%d"))
+
+    # Render email HTML for requested country
+    html = render_email_html(
+        issue=unified_issue,
+        recipient_country=country,
+        run_id=unified_issue.get("run_id", "test"),
+        days=30,
+        raw_count=0,
+        source_count=0,
+    )
+
+    sender_addr = os.environ.get("GMAIL_SENDER", "skenbizst@gmail.com")
+    subject = f"[테스트] SK엔무브 윤활유 시장 뉴스레터 ({date_str[:4]}.{date_str[4:6]}.{date_str[6:]})"
+
+    try:
+        service = await asyncio.to_thread(get_gmail_service)
+        message = create_email(sender_addr, [recipient], subject, html)
+        await asyncio.to_thread(
+            service.users().messages().send(userId="me", body=message).execute
+        )
+    except Exception as e:
+        raise HTTPException(500, f"발송 실패: {e}")
+
+    return {
+        "status": "sent",
+        "recipient": recipient,
+        "country": country,
+        "subject": subject,
+    }
+
+
 @router.get("/recipients")
 async def get_recipients():
     """Return recipients table rows merged into country_recipients format."""
