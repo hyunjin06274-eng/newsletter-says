@@ -39,6 +39,8 @@ env:
   DEFAULT_RECIPIENTS: ${{ secrets.DEFAULT_RECIPIENTS }}
   SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
   SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+  USE_UNIFIED_NEWSLETTER: "true"
+  WEB_BASE_URL: "https://frontend-gamma-eight-32.vercel.app"
 
 jobs:
   run-newsletter:

@@ -524,7 +524,11 @@ def render_email_html(
     Footer includes a link to the web version with ?country=<recipient_country>.
     """
     if not web_base_url:
-        web_base_url = os.environ.get("WEB_BASE_URL", "https://newsletter-says.onrender.com")
+        web_base_url = (
+            os.environ.get("WEB_BASE_URL")
+            or os.environ.get("FRONTEND_URL")
+            or "https://frontend-gamma-eight-32.vercel.app"
+        )
 
     global_section = issue.get("global_section", GlobalSection(articles=[]))
     country_sections = issue.get("country_sections", {})
