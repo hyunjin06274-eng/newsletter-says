@@ -17,8 +17,30 @@ COUNTRY_CONTEXT = {
     },
     "RU": {
         "name": "러시아", "lang": "Russian",
-        "competitors": ["Lukoil", "Gazpromneft G-Energy", "Rosneft", "Shell Russia", "Castrol Russia", "Tatneft"],
-        "forward_industries": ["Russia car sales Lada", "Russia truck fleet KAMAZ", "Russia oil refinery base oil", "Russia sanctions oil export"],
+        "competitors": [
+            # 러시아어 브랜드명 — 현지 RSS에서 검색 효율↑
+            "Лукойл моторное масло смазочные",          # Lukoil engine oil
+            "Газпромнефть G-Energy смазочные материалы", # Gazpromneft G-Energy
+            "Роснефть базовые масла RNPK",               # Rosneft base oils
+            "Татнефть моторное масло Татнефть-АЗС",     # Tatneft engine oil
+            "Castrol Russia моторное масло",
+            "Shell Helix Russia рынок масел",
+        ],
+        "forward_industries": [
+            "Россия авторынок продажи Lada AVTOVAZ",     # Russia car market Lada
+            "Россия грузовой транспорт КАМАЗ моторное масло", # Russia truck KAMAZ
+            "Россия базовые масла НПЗ производство",     # Russia base oil refinery
+            "Россия санкции нефтепродукты экспорт",      # Russia sanctions oil
+            "Russia lubricant market 2024 2025 sanctions", # English hybrid
+            "Russia automotive sales used cars lubricant demand",
+            "Russia industrial equipment lubricant mining",
+        ],
+        "local_media": [
+            "Нефть и газ Россия смазочные материалы",    # Oil & gas Russia lubricants
+            "Автостат Россия продажи автомобилей",       # Autostat Russia car sales
+            "lubricants Russia market site:lubes-e.com OR site:lubesngreases.com",
+            "Russia engine oil market Khabarovsk Siberia",
+        ],
     },
     "VN": {
         "name": "베트남", "lang": "Vietnamese",
