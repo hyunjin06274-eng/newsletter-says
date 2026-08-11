@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS runs (
   current_phase TEXT DEFAULT '',
   phase_status JSONB DEFAULT '{}',
   errors JSONB DEFAULT '[]',
-  newsletter_html JSONB DEFAULT '{}',
+  newsletter_html JSONB DEFAULT '{}',  -- legacy: {country -> html_string}; kept for rollback
+  unified_issue JSONB DEFAULT NULL,    -- unified: structured UnifiedIssue object (null if flag off)
   audit_iterations INTEGER DEFAULT 0,
   total_collected INTEGER DEFAULT 0,
   total_filtered INTEGER DEFAULT 0,
@@ -18,6 +19,10 @@ CREATE TABLE IF NOT EXISTS runs (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   completed_at TIMESTAMPTZ
 );
+
+-- Migration: add unified_issue column to existing runs table
+-- Run once in Supabase SQL Editor if the table already exists:
+-- ALTER TABLE runs ADD COLUMN IF NOT EXISTS unified_issue JSONB DEFAULT NULL;
 
 -- 2. Settings table (schedule + recipients)
 CREATE TABLE IF NOT EXISTS settings (

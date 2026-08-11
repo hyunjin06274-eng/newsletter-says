@@ -160,6 +160,34 @@ async def get_newsletter(run_id: str, country: str = "KR"):
     return NewsletterPreview(country=country, html=html, date_str=rows[0].get("date_str", ""), article_count=0)
 
 
+@router.get("/newsletters/{run_id}/web")
+async def get_newsletter_web(run_id: str, country: str = "KR"):
+    """Return the web tab UI HTML for a unified issue.
+
+    ?country=XX sets the initially active tab (defaults to KR).
+    Falls back to per-country HTML if unified_issue is not available.
+    """
+    db = get_supabase()
+    rows = db.select("runs", {"id": f"eq.{run_id}", "select": "unified_issue,newsletter_html,date_str"})
+    if not rows:
+        raise HTTPException(404, "Run not found")
+
+    row = rows[0]
+    unified_issue = row.get("unified_issue")
+
+    if unified_issue:
+        from backend.agent.nodes.renderer import render_web_html
+        html = render_web_html(unified_issue, default_country=country)
+        return {"html": html, "mode": "unified", "date_str": row.get("date_str", "")}
+
+    # Fallback: legacy per-country HTML
+    newsletters = row.get("newsletter_html", {})
+    html = newsletters.get(country, "")
+    if not html:
+        raise HTTPException(404, f"Newsletter not found for {country}")
+    return {"html": html, "mode": "legacy", "date_str": row.get("date_str", "")}
+
+
 @router.get("/settings")
 async def get_settings():
     import os

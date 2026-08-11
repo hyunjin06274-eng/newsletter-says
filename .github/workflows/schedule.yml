@@ -158,7 +158,7 @@ jobs:
       - name: Run newsletter pipeline
         run: |
           PYTHONPATH=. python -u -c "
-          import asyncio, os, json, sys, time
+          import asyncio, os, json, sys, requests
 
           # Force unbuffered output
           sys.stdout.reconfigure(line_buffering=True)
@@ -167,6 +167,9 @@ jobs:
 
           countries = os.environ.get('INPUT_COUNTRIES', 'KR').split(',')
           countries = [c.strip() for c in countries]
+          run_id = os.environ.get('RUN_ID', '')
+          supabase_url = os.environ.get('SUPABASE_URL', '')
+          supabase_key = os.environ.get('SUPABASE_KEY', '')
           print(f'=== Starting pipeline for {countries} ===', flush=True)
 
           async def main():
@@ -194,13 +197,41 @@ jobs:
 
                       print(f'[{node_name}] Phase: {phase}{stats}', flush=True)
 
-              # Save newsletters
+              # Save newsletters to local files (for artifact upload)
               newsletters = final.get('newsletters', {})
               os.makedirs('output/newsletters', exist_ok=True)
               for country, html in newsletters.items():
                   with open(f'output/newsletters/newsletter_{country}.html', 'w') as f:
                       f.write(html)
                   print(f'Saved newsletter_{country}.html ({len(html)} chars)', flush=True)
+
+              # Save newsletter_html + unified_issue to Supabase for web preview
+              if run_id and supabase_url and supabase_key:
+                  headers = {
+                      'apikey': supabase_key,
+                      'Authorization': f'Bearer {supabase_key}',
+                      'Content-Type': 'application/json',
+                      'Prefer': 'return=minimal',
+                  }
+                  patch_payload = {'newsletter_html': newsletters}
+                  unified_issue = final.get('unified_issue')
+                  if unified_issue:
+                      patch_payload['unified_issue'] = unified_issue
+                  try:
+                      resp = requests.patch(
+                          f'{supabase_url}/rest/v1/runs?id=eq.{run_id}',
+                          headers=headers,
+                          json=patch_payload,
+                          timeout=30,
+                      )
+                      if resp.status_code == 204:
+                          print(f'Saved newsletter_html ({len(newsletters)} countries) to Supabase run {run_id}', flush=True)
+                          if unified_issue:
+                              print('Saved unified_issue to Supabase', flush=True)
+                      else:
+                          print(f'Supabase patch failed: {resp.status_code} {resp.text}', flush=True)
+                  except Exception as e:
+                      print(f'Supabase save error: {e}', flush=True)
 
               print(f'=== Pipeline completed! {len(newsletters)} newsletters ===', flush=True)
 
@@ -209,6 +240,7 @@ jobs:
         env:
           INPUT_COUNTRIES: ${{ env.ACTIVE_COUNTRIES }}
           INPUT_DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+          RUN_ID: ${{ env.RUN_ID }}
 
       - name: Update Supabase run to "completed"
         if: success()
