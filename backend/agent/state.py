@@ -131,6 +131,7 @@ PHASE_NAMES = [
     "collection",
     "merge",
     "scoring",
+    "history_filter",
     "enrichment",
     "grouping",
     "kpi",

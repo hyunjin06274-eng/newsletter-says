@@ -22,6 +22,7 @@ from backend.agent.nodes.keyword_generator import generate_keywords
 from backend.agent.nodes.collector import collect_news
 from backend.agent.nodes.merger import merge_and_dedupe
 from backend.agent.nodes.scorer import score_articles
+from backend.agent.nodes.history_filter import filter_published_articles
 from backend.agent.nodes.enricher import enrich_snippets
 from backend.agent.nodes.grouper import group_articles
 from backend.agent.nodes.kpi_fetcher import fetch_kpi_data
@@ -58,6 +59,7 @@ def create_graph() -> StateGraph:
     builder.add_node("collect", collect_news)
     builder.add_node("merge", merge_and_dedupe)
     builder.add_node("score", score_articles)
+    builder.add_node("filter_published", filter_published_articles)
     builder.add_node("enrich", enrich_snippets)
     builder.add_node("group", group_articles)
     builder.add_node("fetch_kpi", fetch_kpi_data)
@@ -69,7 +71,8 @@ def create_graph() -> StateGraph:
     builder.add_edge("generate_keywords", "collect")
     builder.add_edge("collect", "merge")
     builder.add_edge("merge", "score")
-    builder.add_edge("score", "enrich")
+    builder.add_edge("score", "filter_published")
+    builder.add_edge("filter_published", "enrich")
     builder.add_edge("enrich", "group")
     builder.add_edge("group", "fetch_kpi")
     builder.add_edge("fetch_kpi", "write")
