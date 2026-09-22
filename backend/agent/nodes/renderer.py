@@ -512,9 +512,10 @@ def _country_divider() -> str:
 def _country_toc(ordered: list[str], web_base_url: str = "") -> str:
     """Compact country navigation bar shown below the email header.
 
-    Links to the web version with ?country=XX if web_base_url is set,
-    otherwise falls back to in-email anchors (works in Outlook / Apple Mail;
-    Gmail strips id/name attributes but the bar still renders as a visual cue).
+    Always uses in-email anchors (#country-XX) so clicking scrolls to that
+    country section within the email. All country sections are included inline,
+    so no web redirect is needed.
+    Gmail strips id/name attributes but the bar still renders as a visual cue.
     Returns empty string when there is only one country.
     """
     if len(ordered) <= 1:
@@ -523,7 +524,7 @@ def _country_toc(ordered: list[str], web_base_url: str = "") -> str:
     for cc in ordered:
         name = COUNTRY_NAMES.get(cc, cc)
         emoji = COUNTRY_EMOJIS.get(cc, "🌐")
-        href = f"{web_base_url}?country={cc}" if web_base_url else f"#country-{cc}"
+        href = f"#country-{cc}"
         cells += (
             f'              <td style="padding:0 8px;white-space:nowrap;">'
             f'<a href="{href}" style="font-family:{FONT};font-size:12px;'
