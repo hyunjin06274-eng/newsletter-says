@@ -175,6 +175,32 @@ def build_unified_issue(
         )
         logger.info(f"[issue_builder] {cc}: {len(local_articles)} local articles")
 
+    # ── Step 3: Cross-country local dedup ────────────────────────────────────
+    # Prevent the same article appearing in multiple country sections.
+    # Process countries in pipeline order; first occurrence (highest-priority country) wins.
+    cross_urls: set[str] = set()
+    cross_titles: list[str] = []
+    for cc in countries:
+        cs = country_sections[cc]
+        kept = []
+        for a in cs["articles"]:
+            if _is_duplicate(a, cross_urls, cross_titles):
+                logger.info(
+                    f"[issue_builder] Cross-country dup removed from {cc}: "
+                    f"'{a.get('title', '')[:60]}'"
+                )
+            else:
+                kept.append(a)
+                _register(a, cross_urls, cross_titles)
+        if len(kept) != len(cs["articles"]):
+            country_sections[cc] = CountrySection(
+                country=cc,
+                articles=kept,
+                insights=cs.get("insights", []),
+                recommendations=cs.get("recommendations", []),
+                kpi_data=cs.get("kpi_data", {}),
+            )
+
     return UnifiedIssue(
         run_id=run_id,
         date_str=date_str,

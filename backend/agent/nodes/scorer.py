@@ -331,6 +331,35 @@ GLOBAL_LEVELUP_KEYWORDS = [
 ]
 
 
+def _recency_bonus(published_date: str) -> int:
+    """Return score bonus based on article age relative to now.
+
+    +3 for articles published within 7 days (very recent)
+    +1 for articles published 8–14 days ago
+    0  for older articles or unparseable dates
+    """
+    if not published_date:
+        return 0
+    try:
+        from email.utils import parsedate_to_datetime
+        dt = parsedate_to_datetime(published_date.strip())
+        days = (datetime.now(dt.tzinfo) - dt).days
+    except Exception:
+        m = re.search(r"(\d{4})[-/.](\d{2})[-/.](\d{2})", published_date)
+        if not m:
+            return 0
+        try:
+            dt = datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+            days = (datetime.now() - dt).days
+        except Exception:
+            return 0
+    if days <= 7:
+        return 3
+    if days <= 14:
+        return 1
+    return 0
+
+
 def is_blocklisted(title: str, snippet: str = "") -> bool:
     """Regex blocklist check — rejects articles matching known irrelevant patterns.
 
@@ -551,9 +580,19 @@ async def score_articles(state: NewsletterState) -> dict:
                     sc = 1
                     print(f"  🌐 [{country}] Level-up → global: {title_short}", flush=True)
 
+                # ── 최신 기사 가중치: 7일 이내 +3점, 14일 이내 +1점 ──────────────
+                bonus = _recency_bonus(scored_article.get("published_date", ""))
+                if bonus > 0 and scope != "other_country":
+                    scored_article["score"] = scored_article.get("score", 0) + bonus
+                    s = scored_article["score"]
+                    scored_article["score_reason"] = (
+                        f"{scored_article.get('score_reason', '')} [+{bonus}최신]"
+                    )
+                    print(f"  📅 [{country}] Recency +{bonus}: {title_short}", flush=True)
+
                 if scope == "global":
-                    # Global articles: judge on sales+action only (20-pt scale)
-                    global_relevance = scored_article.get("score_sales", 0) + scored_article.get("score_action", 0)
+                    # Global articles: judge on sales+action + recency bonus (20-pt scale)
+                    global_relevance = scored_article.get("score_sales", 0) + scored_article.get("score_action", 0) + bonus
                     global_bar = round(min_total_score * 2 / 3)
                     accept = global_relevance >= global_bar
                     reason = f"global relevance={global_relevance}<{global_bar}"

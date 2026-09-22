@@ -168,13 +168,13 @@ def _article_card(article: Article, is_last: bool = False, show_global_badge: bo
 """
 
 
-def _sector_block(sector: str, articles: list[Article]) -> str:
+def _sector_block(sector: str, articles: list[Article], max_articles: int = 5) -> str:
     if not articles:
         return ""
     cfg = SECTOR_CONFIGS.get(sector, SECTOR_CONFIGS["윤활유동향"])
     cards = "".join(
-        _article_card(a, is_last=(i == min(len(articles), 5) - 1))
-        for i, a in enumerate(articles[:5])
+        _article_card(a, is_last=(i == min(len(articles), max_articles) - 1))
+        for i, a in enumerate(articles[:max_articles])
     )
     return f"""
           <!-- ── {sector} ── -->
@@ -292,13 +292,13 @@ def _kpi_dashboard(kpi: dict | None) -> str:
 """
 
 
-def _articles_by_sector(articles: list[Article]) -> str:
+def _articles_by_sector(articles: list[Article], max_articles: int = 5) -> str:
     sectors: dict[str, list[Article]] = {}
     for a in articles:
         sectors.setdefault(a.get("sector", "윤활유동향"), []).append(a)
     for s in sectors:
         sectors[s].sort(key=lambda x: x.get("score", 0), reverse=True)
-    return "".join(_sector_block(s, sectors[s]) for s in SECTOR_ORDER if s in sectors)
+    return "".join(_sector_block(s, sectors[s], max_articles) for s in SECTOR_ORDER if s in sectors)
 
 
 def _fallback_insights(articles: list[Article]) -> list[str]:
@@ -404,12 +404,12 @@ def _email_footer() -> str:
 # ── Section renderers ─────────────────────────────────────────────────────────
 
 
-def _render_global_section_email(global_section: GlobalSection, days: int) -> str:
+def _render_global_section_email(global_section: GlobalSection, days: int, max_articles: int = 5) -> str:
     articles = global_section.get("articles", [])
     if not articles:
         return ""
 
-    sector_html = _articles_by_sector(articles)
+    sector_html = _articles_by_sector(articles, max_articles)
     all_insights = _fallback_insights(articles)
     insights_html = _insights_html(all_insights)
 
@@ -431,7 +431,7 @@ def _render_global_section_email(global_section: GlobalSection, days: int) -> st
       </tr>"""
 
 
-def _render_country_section_email(cs: CountrySection) -> str:
+def _render_country_section_email(cs: CountrySection, max_articles: int = 5) -> str:
     country = cs.get("country", "")
     articles = cs.get("articles", [])
     name = COUNTRY_NAMES.get(country, country)
@@ -449,9 +449,10 @@ def _render_country_section_email(cs: CountrySection) -> str:
         empty_msg = f'<tr><td style="padding:20px 0;font-family:{FONT};font-size:14px;color:#999;">이번 호에는 {name} 관련 소식이 없습니다.</td></tr>'
         sector_html = f'<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">{empty_msg}</table>'
     else:
-        sector_html = _articles_by_sector(articles)
+        sector_html = _articles_by_sector(articles, max_articles)
 
     return f"""      <!-- ═══ COUNTRY SECTION: {country} ═══ -->
+      <tr><td style="font-size:0;line-height:0;padding:0;"><a name="country-{country}"></a></td></tr>
       <tr>
         <td style="background-color:#FFFFFF;padding:28px 28px 0 28px;">
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
@@ -508,6 +509,41 @@ def _country_divider() -> str:
       </tr>"""
 
 
+def _country_toc(ordered: list[str], web_base_url: str = "") -> str:
+    """Compact country navigation bar shown below the email header.
+
+    Links to the web version with ?country=XX if web_base_url is set,
+    otherwise falls back to in-email anchors (works in Outlook / Apple Mail;
+    Gmail strips id/name attributes but the bar still renders as a visual cue).
+    Returns empty string when there is only one country.
+    """
+    if len(ordered) <= 1:
+        return ""
+    cells = ""
+    for cc in ordered:
+        name = COUNTRY_NAMES.get(cc, cc)
+        emoji = COUNTRY_EMOJIS.get(cc, "🌐")
+        href = f"{web_base_url}?country={cc}" if web_base_url else f"#country-{cc}"
+        cells += (
+            f'              <td style="padding:0 8px;white-space:nowrap;">'
+            f'<a href="{href}" style="font-family:{FONT};font-size:12px;'
+            f'color:#C8121A;text-decoration:none;">{emoji}&nbsp;{name}</a>'
+            f'</td>\n'
+        )
+    return f"""      <!-- ═══ COUNTRY TOC ═══ -->
+      <tr>
+        <td style="background-color:#FFF5F5;padding:8px 28px;border-bottom:1px solid #F0D0D0;">
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+            <tr>
+              <td style="padding-right:10px;white-space:nowrap;">
+                <span style="font-family:{FONT};font-size:11px;color:#999;letter-spacing:1px;">바로가기</span>
+              </td>
+{cells}            </tr>
+          </table>
+        </td>
+      </tr>"""
+
+
 def render_email_html(
     issue: UnifiedIssue,
     recipient_country: str,
@@ -531,25 +567,27 @@ def render_email_html(
     # Only include countries that have a section in the issue
     ordered = [c for c in ordered if c in country_sections or c == recipient_country]
 
+    # Static parts (same regardless of article limit)
     header = _email_header(
         recipient_country, issue.get("date_str", ""), days,
         raw_count, source_count, total_countries=len(ordered),
     )
-    global_html = _render_global_section_email(global_section, days)
-
-    # Render all country sections with dividers between them
-    all_countries_html = ""
-    for i, cc in enumerate(ordered):
-        cs = country_sections.get(cc, CountrySection(
-            country=cc, articles=[], insights=[], recommendations=[], kpi_data={},
-        ))
-        if i > 0:
-            all_countries_html += _country_divider()
-        all_countries_html += _render_country_section_email(cs)
-
+    toc = _country_toc(ordered, web_base_url)
     footer = _email_footer()
 
-    return f"""<!DOCTYPE html>
+    GMAIL_LIMIT = 95 * 1024  # 95 KB safety margin (Gmail clips at ~102 KB)
+
+    def _build(max_per: int) -> str:
+        g_html = _render_global_section_email(global_section, days, max_per)
+        ac_html = ""
+        for i, cc in enumerate(ordered):
+            cs = country_sections.get(cc, CountrySection(
+                country=cc, articles=[], insights=[], recommendations=[], kpi_data={},
+            ))
+            if i > 0:
+                ac_html += _country_divider()
+            ac_html += _render_country_section_email(cs, max_per)
+        return f"""<!DOCTYPE html>
 <html lang="ko" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
   <meta charset="UTF-8">
@@ -573,8 +611,9 @@ def render_email_html(
     <td align="center" style="padding:20px 8px;">
     <table role="presentation" width="620" cellspacing="0" cellpadding="0" border="0" style="width:620px;max-width:620px;">
 {header}
-{global_html}
-{all_countries_html}
+{toc}
+{g_html}
+{ac_html}
 {footer}
     </table>
     </td>
@@ -583,6 +622,18 @@ def render_email_html(
 <!--[if mso]></td></tr></table><![endif]-->
 </body>
 </html>"""
+
+    # Auto-size: try 5 → 3 → 2 articles per sector until under Gmail limit
+    html = _build(5)
+    size = len(html.encode("utf-8"))
+    if size > GMAIL_LIMIT:
+        html = _build(3)
+        size = len(html.encode("utf-8"))
+        if size > GMAIL_LIMIT:
+            html = _build(2)
+            size = len(html.encode("utf-8"))
+    print(f"📧 Email HTML size: {size // 1024}KB / 95KB limit", flush=True)
+    return html
 
 
 def render_web_html(
